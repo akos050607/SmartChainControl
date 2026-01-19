@@ -1,7 +1,47 @@
 ﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
+@using SmartChainControl.Shared.Models
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
 
-<PageTitle>Home</PageTitle>
+<PageTitle>SmartChainControl - 3D View</PageTitle>
 
-<h1>Hello, world!</h1>
+<canvas id="renderCanvas"></canvas>
 
-Welcome to your new app.
+@code {
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var serverUrl = "http://localhost:5206/warehousehub"; 
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(serverUrl)
+            .AddMessagePackProtocol()
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<List<Robot>>("ReceiveState", async (robots) =>
+        {
+            await JS.InvokeVoidAsync("warehouseVisualizer.updateRobots", robots);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("warehouseVisualizer.init", "renderCanvas");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
