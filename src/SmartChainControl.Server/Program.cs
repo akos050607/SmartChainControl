@@ -9,17 +9,17 @@ builder.Services.AddSignalR()
        .AddMessagePackProtocol();
 builder.Services.AddSingleton<SimulationManager>();
 builder.Services.AddHostedService<GameLoopWorker>();
-
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("https://localhost:7120", "http://localhost:5120")
+        policy.SetIsOriginAllowed(origin => true) 
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
+
 
 builder.Services.AddResponseCompression(opts =>
 {
@@ -41,8 +41,6 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
-
-app.MapControllers();
 
 app.UseResponseCompression();
 app.UseCors();
