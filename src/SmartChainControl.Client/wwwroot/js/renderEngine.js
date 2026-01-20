@@ -35,6 +35,26 @@ window.warehouseVisualizer = {
         });
     },
 
+    createMap: function (mapData) {
+        
+        mapData.obstacles.forEach(obs => {
+            var shelf = BABYLON.MeshBuilder.CreateBox("obs_" + obs.x + "_" + obs.y, { 
+                width: 1, 
+                depth: 1, 
+                height: 2
+            }, this.scene);
+
+            shelf.position.x = obs.x;
+            shelf.position.z = obs.y;
+            shelf.position.y = 1;
+
+            var shelfMat = new BABYLON.StandardMaterial("shelfMat", this.scene);
+            shelfMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.35);
+            shelfMat.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.15);
+            shelf.material = shelfMat;
+        });
+    },
+
     updateRobots: function (robotsData) {
         robotsData.forEach(robot => {
             if (!this.robotMeshes[robot.id]) {
