@@ -6,27 +6,45 @@ namespace SmartChainControl.Server.Services;
 public class SimulationManager
 {
     public List<Robot> Robots { get; private set; } = new();
-    
+    public MapInfo Map { get; private set; }
+
     private readonly Random _random = new();
-    private const int MapSize = 20;
+    private const int MapWidth = 20;
+    private const int MapHeight = 20;
 
     public SimulationManager()
     {
+        Map = GenerateWarehouseMap();
+
         for (int i = 1; i <= 5; i++)
         {
             Robots.Add(new Robot
             {
                 Id = i,
-                X = _random.Next(0, MapSize),
-                Y = _random.Next(0, MapSize),
-                TargetX = _random.Next(0, MapSize),
-                TargetY = _random.Next(0, MapSize),
+                X = 0, Y = i * 2,
+                TargetX = _random.Next(0, MapWidth),
+                TargetY = _random.Next(0, MapHeight),
                 ColorHex = GetRandomNeonColor(),
                 State = "Idle"
             });
         }
     }
 
+    private MapInfo GenerateWarehouseMap()
+    {
+        var map = new MapInfo { Width = MapWidth, Height = MapHeight };
+
+        for (int x = 2; x < MapWidth - 2; x += 3)
+        {
+            for (int y = 2; y < MapHeight - 2; y++)
+            {
+                if (y == 10) continue; 
+
+                map.Obstacles.Add(new Obstacle { X = x, Y = y, Type = "Shelf" });
+            }
+        }
+        return map;
+    }
     public void Update()
     {
         foreach (var robot in Robots)
@@ -45,8 +63,8 @@ public class SimulationManager
             }
             else
             {
-                robot.TargetX = _random.Next(0, MapSize);
-                robot.TargetY = _random.Next(0, MapSize);
+                robot.TargetX = _random.Next(0, MapWidth);
+                robot.TargetY = _random.Next(0, MapWidth);
                 robot.State = "Idle";
             }
         }

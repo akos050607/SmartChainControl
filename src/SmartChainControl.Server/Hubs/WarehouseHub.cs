@@ -15,6 +15,7 @@ public class WarehouseHub : Hub
 
     public override async Task OnConnectedAsync()
     {
+        await Clients.Caller.SendAsync("ReceiveMap", _simulationManager.Map);
         await Clients.Caller.SendAsync("ReceiveState", _simulationManager.Robots);
         await base.OnConnectedAsync();
     }
