@@ -13,19 +13,22 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var serverUrl = "http://localhost:5206/warehousehub"; 
+        var serverUrl = "http://localhost:5206/warehousehub";
 
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(serverUrl)
-            .AddMessagePackProtocol()
-            .WithAutomaticReconnect()
-            .Build();
+        .WithUrl(serverUrl)
+        .AddMessagePackProtocol()
+        .WithAutomaticReconnect()
+        .Build();
 
         hubConnection.On<List<Robot>>("ReceiveState", async (robots) =>
         {
             await JS.InvokeVoidAsync("warehouseVisualizer.updateRobots", robots);
         });
-
+        hubConnection.On<MapInfo>("ReceiveMap", async (map) =>
+        {
+            await JS.InvokeVoidAsync("warehouseVisualizer.createMap", map);
+        });
         await hubConnection.StartAsync();
     }
 
