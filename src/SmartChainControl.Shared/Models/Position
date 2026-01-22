@@ -1,1 +1,4 @@
-public class Position { public float X { get; set; } public float Y { get; set; } }
+namespace SmartChainControl.Shared.Models
+{
+    public class Position { public float X { get; set; } public float Y { get; set; } }
+}
