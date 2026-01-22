@@ -55,23 +55,62 @@ window.warehouseVisualizer = {
         });
     },
 
+    highlightedShelves: {},
+
     updateRobots: function (robotsData) {
+        this.clearShelfHighlights();
+
         robotsData.forEach(robot => {
-            if (!this.robotMeshes[robot.id]) {
-                var box = BABYLON.MeshBuilder.CreateBox("robot_" + robot.id, { size: 0.8 }, this.scene);
+            var mesh = this.robotMeshes[robot.id];
+
+            if (!mesh) {
+                mesh = BABYLON.MeshBuilder.CreateBox("robot_" + robot.id, { size: 0.8 }, this.scene);
+                var mat = new BABYLON.StandardMaterial("mat_" + robot.id, this.scene);
+                mat.emissiveColor = BABYLON.Color3.FromHexString(robot.colorHex);
+                mesh.material = mat;
                 
-                var material = new BABYLON.StandardMaterial("mat_" + robot.id, this.scene);
-                material.emissiveColor = BABYLON.Color3.FromHexString(robot.colorHex);
-                box.material = material;
+                var cargoBox = BABYLON.MeshBuilder.CreateBox("cargo_" + robot.id, { size: 0.5 }, this.scene);
+                cargoBox.parent = mesh;
+                cargoBox.position.y = 0.7;
                 
-                this.robotMeshes[robot.id] = box;
+                var cargoMat = new BABYLON.StandardMaterial("cargoMat", this.scene);
+                cargoMat.diffuseColor = new BABYLON.Color3(0, 1, 0);
+                cargoMat.emissiveColor = new BABYLON.Color3(0, 0.5, 0);
+                cargoBox.material = cargoMat;
+                cargoBox.isVisible = false;
+                mesh.cargoMesh = cargoBox; 
+
+                this.robotMeshes[robot.id] = mesh;
             }
 
-            var mesh = this.robotMeshes[robot.id];
-            
-            mesh.position.x = robot.x;
-            mesh.position.z = robot.y; 
-            mesh.position.y = 0.4;
+            mesh.position.x = BABYLON.Scalar.Lerp(mesh.position.x, robot.x, 0.2);
+            mesh.position.z = BABYLON.Scalar.Lerp(mesh.position.z, robot.y, 0.2);
+
+            if (mesh.cargoMesh) {
+                mesh.cargoMesh.isVisible = robot.hasCargo;
+            }
+
+            if (robot.currentTargetNode) {
+                this.highlightShelf(robot.currentTargetNode.x, robot.currentTargetNode.y, robot.colorHex);
+            }
         });
+    },
+
+    highlightShelf: function(x, y, colorHex) {
+        var shelfId = "obs_" + x + "_" + y;
+        var shelfMesh = this.scene.getMeshByName(shelfId);
+        
+        if (shelfMesh) {
+            shelfMesh.material.emissiveColor = BABYLON.Color3.FromHexString(colorHex);
+            this.highlightedShelves[shelfId] = shelfMesh;
+        }
+    },
+
+    clearShelfHighlights: function() {
+        for (var id in this.highlightedShelves) {
+            var mesh = this.highlightedShelves[id];
+            mesh.material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.15); 
+        }
+        this.highlightedShelves = {};
     }
 };
