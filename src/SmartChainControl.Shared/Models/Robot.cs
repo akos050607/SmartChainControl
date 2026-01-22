@@ -10,6 +10,8 @@ namespace SmartChainControl.Shared.Models
         public float TargetX { get; set; }
         public float TargetY { get; set; }
 
+        public List<Position> CurrentPath { get; set; } = new();
+
         public float Rotation { get; set; }
 
         public string State { get; set; } = "Idle";

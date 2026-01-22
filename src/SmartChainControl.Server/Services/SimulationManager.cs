@@ -8,6 +8,7 @@ public class SimulationManager
     public List<Robot> Robots { get; private set; } = new();
     public MapInfo Map { get; private set; }
 
+    private Pathfinder _pathfinder;
     private readonly Random _random = new();
     private const int MapWidth = 20;
     private const int MapHeight = 20;
@@ -15,6 +16,7 @@ public class SimulationManager
     public SimulationManager()
     {
         Map = GenerateWarehouseMap();
+        _pathfinder = new Pathfinder(Map);
 
         for (int i = 1; i <= 5; i++)
         {
@@ -49,27 +51,54 @@ public class SimulationManager
     {
         foreach (var robot in Robots)
         {
-            float speed = 0.1f;
-            
-            if (Math.Abs(robot.X - robot.TargetX) > 0.1)
+            if (robot.CurrentPath == null || robot.CurrentPath.Count == 0)
             {
-                robot.X += robot.TargetX > robot.X ? speed : -speed;
-                robot.State = "Moving";
+                int tx, ty;
+                do
+                {
+                    tx = _random.Next(0, Map.Width);
+                    ty = _random.Next(0, Map.Height);
+                } while (IsShelf(tx, ty));
+
+                robot.TargetX = tx;
+                robot.TargetY = ty;
+                
+                var path = _pathfinder.FindPath((int)robot.X, (int)robot.Y, tx, ty);
+                if (path != null && path.Count > 1) 
+                {
+                    path.RemoveAt(0);
+                    robot.CurrentPath = path;
+                    robot.State = "Moving";
+                }
             }
-            else if (Math.Abs(robot.Y - robot.TargetY) > 0.1)
+
+            if (robot.CurrentPath != null && robot.CurrentPath.Count > 0)
             {
-                robot.Y += robot.TargetY > robot.Y ? speed : -speed;
-                robot.State = "Moving";
-            }
-            else
-            {
-                robot.TargetX = _random.Next(0, MapWidth);
-                robot.TargetY = _random.Next(0, MapWidth);
-                robot.State = "Idle";
+                var nextStep = robot.CurrentPath[0];
+                float speed = 0.2f;
+
+                float dx = nextStep.X - robot.X;
+                float dy = nextStep.Y - robot.Y;
+                
+                if (Math.Abs(dx) < speed && Math.Abs(dy) < speed)
+                {
+                    robot.X = nextStep.X;
+                    robot.Y = nextStep.Y;
+                    robot.CurrentPath.RemoveAt(0);
+                }
+                else
+                {
+                    robot.X += Math.Sign(dx) * speed;
+                    robot.Y += Math.Sign(dy) * speed;
+                }
             }
         }
     }
 
+    private bool IsShelf(int x, int y)
+    {
+        return Map.Obstacles.Any(o => o.X == x && o.Y == y);
+    }
     private string GetRandomNeonColor()
     {
         var colors = new[] { "#00FF00", "#00FFFF", "#FF00FF", "#FFFF00", "#FF4500" };
