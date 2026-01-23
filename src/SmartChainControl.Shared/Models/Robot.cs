@@ -23,5 +23,7 @@ namespace SmartChainControl.Shared.Models
         public bool HasCargo { get; set; }
 
         public int StuckTicks { get; set; } = 0;
+
+        public int PatienceThreshold { get; set; } = 10;
     }
 }

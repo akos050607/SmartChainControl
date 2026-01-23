@@ -30,7 +30,8 @@ public class SimulationManager
                 Y = (i + 1) * 2,
                 ColorHex = _robotColors[i % _robotColors.Length],
                 State = "Idle",
-                CurrentPath = new List<Position>()
+                CurrentPath = new List<Position>(),
+                PatienceThreshold = _random.Next(5, 15) // Kezdeti véletlen türelem
             });
         }
     }
@@ -51,16 +52,16 @@ public class SimulationManager
 
     public void Update()
     {
-        // Először összegyűjtjük az összes robot pozícióját
-        var allRobotPositions = new HashSet<(int, int)>();
+        // 1. Összegyűjtjük a jelenlegi pozíciókat
+        var occupiedCells = new HashSet<(int, int)>();
         foreach (var r in Robots) 
         {
-            allRobotPositions.Add(((int)Math.Round(r.X), (int)Math.Round(r.Y)));
+            occupiedCells.Add(((int)Math.Round(r.X), (int)Math.Round(r.Y)));
         }
 
         foreach (var robot in Robots)
         {
-            // --- ÁLLAPOT GÉP (Feladatkiosztás - ez nem változott) ---
+            // --- ÁLLAPOT GÉP ---
             if (robot.State == "Idle")
             {
                 var shelf = GetRandomShelf();
@@ -71,9 +72,11 @@ public class SimulationManager
                     robot.CurrentTargetNode = new Position { X = shelf.X, Y = shelf.Y };
                     robot.TargetX = entryPoint.X;
                     robot.TargetY = entryPoint.Y;
-                    robot.StuckTicks = 0; // Új feladatnál nullázzuk a türelmet
+                    robot.StuckTicks = 0;
+                    
+                    // Új feladatnál új véletlen türelmet kap
+                    robot.PatienceThreshold = _random.Next(5, 20); 
 
-                    // Kezdeti tervezésnél még nem vesszük figyelembe a többieket (optimista tervezés)
                     var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
                     
                     if (path != null && path.Count > 0)
@@ -102,14 +105,15 @@ public class SimulationManager
                 robot.State = "Idle"; 
             }
 
-            // --- MOZGÁS ÉS ÚJRATERVEZÉS (Traffic Control) ---
-            MoveRobot(robot, allRobotPositions);
+            // --- MOZGÁS ---
+            // Átadjuk az occupiedCells-t referenciaként, hogy azonnal frissüljön!
+            MoveRobot(robot, occupiedCells);
         }
     }
 
-    private void MoveRobot(Robot robot, HashSet<(int, int)> allRobotPositions)
+    private void MoveRobot(Robot robot, HashSet<(int, int)> occupiedCells)
     {
-        // Útvonal tisztítása (saját pozíció levágása)
+        // Útvonal tisztítása (saját pozíció levágása az elejéről)
         while (robot.CurrentPath != null && robot.CurrentPath.Count > 0)
         {
             var nextNode = robot.CurrentPath[0];
@@ -124,47 +128,48 @@ public class SimulationManager
 
         var target = robot.CurrentPath[0];
         
-        // Megnézzük, hogy a következő lépés foglalt-e
-        bool isBlocked = allRobotPositions.Contains(((int)target.X, (int)target.Y));
+        // Ellenőrzés
+        bool isBlocked = occupiedCells.Contains(((int)target.X, (int)target.Y));
 
         if (isBlocked)
         {
-            // Ha blokkolva van, növeljük a türelmetlenség számlálót
             robot.StuckTicks++;
 
-            // Ha már 10 kör óta (kb 0.5 mp) vár, akkor ÚJRATERVEZÉS
-            if (robot.StuckTicks > 10)
+            // ITT A LÉNYEG: Nem fix 10-nél, hanem a robot saját véletlen küszöbénél tervez újra
+            if (robot.StuckTicks > robot.PatienceThreshold)
             {
-                // Készítünk egy listát a többiekről, hogy őket elkerülje
-                var otherRobotsAsObstacles = new HashSet<(int, int)>(allRobotPositions);
-                // A célt ne vegyük ki akadálynak, oda el kell jutni
-                otherRobotsAsObstacles.Remove(((int)robot.TargetX, (int)robot.TargetY));
-
-                // Új útvonal kérése, figyelembe véve a többieket
+                var otherRobotsAsObstacles = new HashSet<(int, int)>(occupiedCells);
+                // A célt ne vegyük ki, csak ha éppen ott áll valaki (de azt a Pathfinder kezeli)
+                
                 var newPath = _pathfinder.FindPath(
                     (int)Math.Round(robot.X), 
                     (int)Math.Round(robot.Y), 
                     (int)robot.TargetX, 
                     (int)robot.TargetY, 
-                    otherRobotsAsObstacles // <--- ITT A TRÜKK
+                    otherRobotsAsObstacles 
                 );
 
                 if (newPath != null)
                 {
                     robot.CurrentPath = newPath;
-                    robot.StuckTicks = 0; // Sikerült, lenullázzuk
+                    robot.StuckTicks = 0;
+                    // Új véletlen türelem a következő alkalomra (hogy ne kerüljenek szinkronba)
+                    robot.PatienceThreshold = _random.Next(5, 15);
                 }
                 else
                 {
-                    // Ha nincs út (pl. teljesen bekerítették), akkor marad a várakozás
-                    // Esetleg egy random szünet, hogy ne egyszerre próbálkozzanak
+                    // Ha nincs út, várunk még egy kicsit, hátha elmegy a másik
+                    robot.PatienceThreshold += 5; 
                 }
             }
         }
         else
         {
-            // Nincs blokkolva, mozgunk
-            robot.StuckTicks = 0; // Mozgásban vagyunk, minden oké
+            // SIKERES MOZGÁS
+            robot.StuckTicks = 0; 
+
+            // 1. Töröljük a régi helyet a foglalt listából
+            occupiedCells.Remove(((int)Math.Round(robot.X), (int)Math.Round(robot.Y)));
 
             float speed = 0.2f;
             float dx = target.X - robot.X;
@@ -180,6 +185,10 @@ public class SimulationManager
                 robot.X += Math.Sign(dx) * speed;
                 robot.Y += Math.Sign(dy) * speed;
             }
+
+            // 2. Azonnal bejegyezzük az ÚJ helyet (vagy a köztes állapotot) a foglalt listába
+            // Így a ciklusban következő robot már látni fogja, hogy ide léptünk!
+            occupiedCells.Add(((int)Math.Round(robot.X), (int)Math.Round(robot.Y)));
         }
     }
 
