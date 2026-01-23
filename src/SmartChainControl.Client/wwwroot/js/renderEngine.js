@@ -2,51 +2,72 @@ window.warehouseVisualizer = {
     canvas: null,
     engine: null,
     scene: null,
-    robotMeshes: {},
-    highlightedShelves: [],
-    glowLayer: null,
+    robotMeshes: {}, 
+    shadowGenerator: null,
+    mirrorTexture: null, 
     
     zoneColors: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF"],
 
     init: function (canvasId) {
+        // Memória ürítése
+        this.robotMeshes = {}; 
+        this.highlightedShelves = [];
+
         this.canvas = document.getElementById(canvasId);
+        
         this.engine = new BABYLON.Engine(this.canvas, true, { 
-            preserveDrawingBuffer: true, stencil: true, adaptToDeviceRatio: true, antialias: true 
+            preserveDrawingBuffer: true, 
+            antialias: true 
         });
         
         this.scene = new BABYLON.Scene(this.engine);
-        this.scene.clearColor = new BABYLON.Color3(0.02, 0.02, 0.04);
+        this.scene.clearColor = new BABYLON.Color3(0.02, 0.02, 0.04); 
 
-        var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 3, 28, new BABYLON.Vector3(10, 0, 10), this.scene);
+        var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 3, 24, new BABYLON.Vector3(10, 0, 10), this.scene);
         camera.attachControl(this.canvas, true);
         camera.wheelPrecision = 50;
+        camera.minZ = 0.5;
 
+        // Fények
         var hemiLight = new BABYLON.HemisphericLight("hemiLight", new BABYLON.Vector3(0, 1, 0), this.scene);
-        hemiLight.intensity = 0.5;
+        hemiLight.intensity = 0.4; 
 
         var dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-1, -2, -1), this.scene);
         dirLight.position = new BABYLON.Vector3(20, 40, 20);
         dirLight.intensity = 0.8;
-        
-        var shadowGenerator = new BABYLON.ShadowGenerator(2048, dirLight);
-        shadowGenerator.useBlurExponentialShadowMap = true;
 
-        this.glowLayer = new BABYLON.GlowLayer("glow", this.scene, { mainTextureRatio: 1, blurKernelSize: 15 });
-        this.glowLayer.intensity = 0.8;
+        // Árnyék
+        this.shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
+        this.shadowGenerator.useBlurExponentialShadowMap = true;
+        this.shadowGenerator.blurKernel = 16; 
 
-        var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 40, height: 40 }, this.scene);
-        ground.position.x = 10; ground.position.z = 10;
-        ground.renderingGroupId = 0;
-        
+        // Tükröződés
+        var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, this.scene);
+        ground.position.x = 10;
+        ground.position.z = 10;
+        ground.receiveShadows = true;
+
+        this.mirrorTexture = new BABYLON.MirrorTexture("mirror", 512, this.scene, true);
+        this.mirrorTexture.mirrorPlane = new BABYLON.Plane(0, -1, 0, 0);
+        this.mirrorTexture.level = 0.4;
+
         var groundMat = new BABYLON.StandardMaterial("groundMat", this.scene);
-        groundMat.diffuseColor = new BABYLON.Color3(0.08, 0.08, 0.1); 
-        groundMat.specularColor = new BABYLON.Color3(0, 0, 0); 
+        groundMat.diffuseColor = new BABYLON.Color3(0.05, 0.05, 0.05); 
+        groundMat.reflectionTexture = this.mirrorTexture; 
+        groundMat.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2); 
         ground.material = groundMat;
 
         this.createDropOffZones();
 
-        this.engine.runRenderLoop(() => { this.scene.render(); });
-        window.addEventListener("resize", () => { this.engine.resize(); });
+        this.engine.runRenderLoop(() => {
+            if (this.scene && this.scene.activeCamera) {
+                this.scene.render();
+            }
+        });
+
+        window.addEventListener("resize", () => {
+            this.engine.resize();
+        });
     },
 
     createDropOffZones: function() {
@@ -56,95 +77,118 @@ window.warehouseVisualizer = {
             let yPos = 2 + (i * 3);
             
             var zone = BABYLON.MeshBuilder.CreateGround("zone_" + i, { width: 1.4, height: 1.4 }, this.scene);
-            zone.position.x = 0; zone.position.z = yPos; zone.position.y = 0.01;
-            zone.renderingGroupId = 0;
+            zone.position.x = 0; zone.position.z = yPos; zone.position.y = 0.02;
             
             var zoneMat = new BABYLON.StandardMaterial("zoneMat_" + i, this.scene);
             zoneMat.diffuseColor = color; 
-            zoneMat.emissiveColor = new BABYLON.Color3(0,0,0); 
-            zoneMat.alpha = 0.6; 
+            zoneMat.emissiveColor = color.scale(0.3); 
+            zoneMat.alpha = 0.8; 
             zone.material = zoneMat;
-            this.glowLayer.addExcludedMesh(zone);
-
-            var border = BABYLON.MeshBuilder.CreateTorus("zoneBorder_" + i, { diameter: 1.4, thickness: 0.04, tessellation: 32 }, this.scene);
-            border.position.x = 0; border.position.z = yPos; border.position.y = 0.02;
-            border.renderingGroupId = 0;
+            
+            var border = BABYLON.MeshBuilder.CreateTorus("zoneBorder_" + i, { diameter: 1.4, thickness: 0.05, tessellation: 32 }, this.scene);
+            border.position.x = 0; border.position.z = yPos; border.position.y = 0.03;
             
             var borderMat = new BABYLON.StandardMaterial("borderMat_" + i, this.scene);
             borderMat.emissiveColor = color; 
             borderMat.diffuseColor = new BABYLON.Color3(0,0,0);
             border.material = borderMat;
-            this.glowLayer.addIncludedOnlyMesh(border);
+            
+            this.mirrorTexture.renderList.push(border);
         }
     },
 
     createMap: function (mapData) {
-        // --- DUPLIKÁCIÓ JAVÍTÁSA: Régi polcok törlése ---
+        // Törlés duplikáció ellen
         mapData.obstacles.forEach(obs => {
             var existing = this.scene.getMeshByName("obs_" + obs.x + "_" + obs.y);
             if (existing) existing.dispose();
         });
 
-        var shelfMat = new BABYLON.StandardMaterial("shelfBaseMat", this.scene);
-        shelfMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.25); 
-        shelfMat.specularColor = new BABYLON.Color3(0, 0, 0); 
+        var shelfMat = new BABYLON.StandardMaterial("shelfMat", this.scene);
+        shelfMat.diffuseColor = new BABYLON.Color3(0.15, 0.15, 0.2); 
+        shelfMat.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3); 
         shelfMat.emissiveColor = new BABYLON.Color3(0, 0, 0); 
-        shelfMat.alpha = 1.0; 
-        shelfMat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE; 
+        
+        // JAVÍTÁS: KIVETTÜK A 'shelfMat.freeze()' PARANCSOT!
+        // Ez okozta, hogy a polc nem váltott vissza feketére.
 
         mapData.obstacles.forEach(obs => {
             var shelf = BABYLON.MeshBuilder.CreateBox("obs_" + obs.x + "_" + obs.y, { 
-                width: 0.9, depth: 0.9, height: 2
+                width: 0.9, depth: 0.9, height: 2.2 
             }, this.scene);
 
-            shelf.position.x = obs.x; shelf.position.z = obs.y; shelf.position.y = 1;
-            shelf.renderingGroupId = 0;
+            shelf.position.x = obs.x;
+            shelf.position.z = obs.y;
+            shelf.position.y = 1.1;
+            
+            shelf.material = shelfMat;
+            shelf.receiveShadows = true;
 
-            shelf.material = shelfMat.clone("shelfMat_" + obs.x + "_" + obs.y);
-            this.glowLayer.addExcludedMesh(shelf);
+            this.shadowGenerator.addShadowCaster(shelf);
+            this.mirrorTexture.renderList.push(shelf);
         });
     },
 
+    createRobotMesh: function(id, colorHex) {
+        var color = BABYLON.Color3.FromHexString(colorHex);
+        
+        var body = BABYLON.MeshBuilder.CreateBox("body_" + id, { width: 0.8, depth: 0.8, height: 0.25 }, this.scene);
+        body.position.y = 0.15; 
+        
+        var bodyMat = new BABYLON.StandardMaterial("bodyMat_" + id, this.scene);
+        bodyMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1); 
+        body.material = bodyMat;
+
+        var core = BABYLON.MeshBuilder.CreateCylinder("core_" + id, { diameter: 0.5, height: 0.05 }, this.scene);
+        core.position.y = 0.13; 
+        core.parent = body;
+        
+        var coreMat = new BABYLON.StandardMaterial("coreMat_" + id, this.scene);
+        coreMat.emissiveColor = color.scale(1.5); 
+        coreMat.diffuseColor = new BABYLON.Color3(0,0,0);
+        core.material = coreMat;
+
+        return { mesh: body };
+    },
+
     updateRobots: function (robotsData) {
+        // Először lekapcsolunk minden polc-fényt
         this.clearShelfHighlights();
 
         robotsData.forEach(robot => {
-            var mesh = this.robotMeshes[robot.id];
+            var robotObj = this.robotMeshes[robot.id];
 
-            if (!mesh) {
-                mesh = BABYLON.MeshBuilder.CreateBox("robot_" + robot.id, { size: 0.8 }, this.scene);
-                var mat = new BABYLON.StandardMaterial("mat_" + robot.id, this.scene);
-                var color = BABYLON.Color3.FromHexString(robot.colorHex);
-                mat.emissiveColor = color.scale(0.8); 
-                mat.diffuseColor = new BABYLON.Color3(0, 0, 0);
-                mesh.material = mat;
+            if (!robotObj) {
+                robotObj = this.createRobotMesh(robot.id, robot.colorHex);
+
+                this.shadowGenerator.addShadowCaster(robotObj.mesh); 
+                this.mirrorTexture.renderList.push(robotObj.mesh);   
+
+                var cargoBox = BABYLON.MeshBuilder.CreateBox("cargo_" + robot.id, { size: 0.5 }, this.scene);
+                cargoBox.parent = robotObj.mesh;
+                cargoBox.position.y = 0.4; 
                 
-                // Röntgen mód bekapcsolva: Mindig látszik a falak mögött is
-                mesh.renderingGroupId = 1; 
-
-                this.glowLayer.addIncludedOnlyMesh(mesh);
-
-                var cargoBox = BABYLON.MeshBuilder.CreateBox("cargo_" + robot.id, { size: 0.4 }, this.scene);
-                cargoBox.parent = mesh; cargoBox.position.y = 0.7; cargoBox.renderingGroupId = 1;
-
                 var cargoMat = new BABYLON.StandardMaterial("cargoMat", this.scene);
-                cargoMat.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.9); 
+                cargoMat.diffuseColor = new BABYLON.Color3(0.9, 0.9, 0.9); 
                 cargoBox.material = cargoMat;
-                mesh.cargoMesh = cargoBox;
-                this.glowLayer.addIncludedOnlyMesh(cargoBox);
+                
+                robotObj.cargoMesh = cargoBox;
+                this.shadowGenerator.addShadowCaster(cargoBox); 
+                this.mirrorTexture.renderList.push(cargoBox);
 
-                this.robotMeshes[robot.id] = mesh;
+                this.robotMeshes[robot.id] = robotObj;
             }
 
+            var mesh = robotObj.mesh;
             mesh.position.x = BABYLON.Scalar.Lerp(mesh.position.x, robot.x, 0.2);
             mesh.position.z = BABYLON.Scalar.Lerp(mesh.position.z, robot.y, 0.2);
-            mesh.position.y = 0.4 + Math.sin(Date.now() * 0.005 + robot.id) * 0.02;
+            mesh.position.y = 0.15 + Math.sin(Date.now() * 0.01 + robot.id) * 0.005;
 
-            if (mesh.cargoMesh) {
-                mesh.cargoMesh.isVisible = robot.hasCargo;
-                if(robot.hasCargo) mesh.cargoMesh.rotation.y += 0.05;
+            if (robotObj.cargoMesh) {
+                robotObj.cargoMesh.isVisible = robot.hasCargo;
             }
 
+            // Ha van cél, felkapcsoljuk a fényt
             if (robot.currentTargetNode) {
                 this.highlightShelf(robot.currentTargetNode.x, robot.currentTargetNode.y, robot.colorHex);
             }
@@ -156,20 +200,24 @@ window.warehouseVisualizer = {
         var shelfMesh = this.scene.getMeshByName(shelfId);
         
         if (shelfMesh) {
+            // Ha kell, klónozzuk az anyagot, hogy egyedileg színezhető legyen
+            if (shelfMesh.material.name === "shelfMat") {
+                shelfMesh.material = shelfMesh.material.clone("highlightMat_" + x + "_" + y);
+            }
             var color = BABYLON.Color3.FromHexString(colorHex);
             shelfMesh.material.emissiveColor = color.scale(0.8);
-            this.glowLayer.removeExcludedMesh(shelfMesh);
-            this.glowLayer.addIncludedOnlyMesh(shelfMesh);
+            
+            // Hozzáadjuk a listához, hogy a következő körben le tudjuk kapcsolni
             this.highlightedShelves.push(shelfMesh);
         }
     },
 
     clearShelfHighlights: function() {
+        // Végigmegyünk az előző körben bekapcsolt polcokon és leoltjuk őket
         this.highlightedShelves.forEach(mesh => {
-            mesh.material.emissiveColor = new BABYLON.Color3(0, 0, 0);
-            this.glowLayer.removeIncludedOnlyMesh(mesh);
-            this.glowLayer.addExcludedMesh(mesh);
+            mesh.material.emissiveColor = new BABYLON.Color3(0, 0, 0); // Fekete = Kikapcsolva
         });
+        // Lista ürítése
         this.highlightedShelves = [];
     }
 };
