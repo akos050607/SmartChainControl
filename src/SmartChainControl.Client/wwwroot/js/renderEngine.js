@@ -8,8 +8,8 @@ window.warehouseVisualizer = {
     
     zoneColors: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF"],
 
+    // Initialize scene, camera, lights, ground, and render loop
     init: function (canvasId) {
-        // Memória ürítése
         this.robotMeshes = {}; 
         this.highlightedShelves = [];
 
@@ -28,7 +28,6 @@ window.warehouseVisualizer = {
         camera.wheelPrecision = 50;
         camera.minZ = 0.5;
 
-        // Fények
         var hemiLight = new BABYLON.HemisphericLight("hemiLight", new BABYLON.Vector3(0, 1, 0), this.scene);
         hemiLight.intensity = 0.4; 
 
@@ -36,12 +35,10 @@ window.warehouseVisualizer = {
         dirLight.position = new BABYLON.Vector3(20, 40, 20);
         dirLight.intensity = 0.8;
 
-        // Árnyék
         this.shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
         this.shadowGenerator.useBlurExponentialShadowMap = true;
         this.shadowGenerator.blurKernel = 16; 
 
-        // Tükröződés
         var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, this.scene);
         ground.position.x = 10;
         ground.position.z = 10;
@@ -49,7 +46,7 @@ window.warehouseVisualizer = {
 
         this.mirrorTexture = new BABYLON.MirrorTexture("mirror", 512, this.scene, true);
         this.mirrorTexture.mirrorPlane = new BABYLON.Plane(0, -1, 0, 0);
-        this.mirrorTexture.level = 0.4;
+        this.mirrorTexture.level = 0.35; 
 
         var groundMat = new BABYLON.StandardMaterial("groundMat", this.scene);
         groundMat.diffuseColor = new BABYLON.Color3(0.05, 0.05, 0.05); 
@@ -59,8 +56,10 @@ window.warehouseVisualizer = {
 
         this.createDropOffZones();
 
+        // Main render loop: animate drones and render scene
         this.engine.runRenderLoop(() => {
             if (this.scene && this.scene.activeCamera) {
+                this.animateDrones(); 
                 this.scene.render();
             }
         });
@@ -70,6 +69,36 @@ window.warehouseVisualizer = {
         });
     },
 
+    // Animate drones: propellers, strobe when carrying cargo, gentle hover
+    animateDrones: function() {
+        var now = Date.now();
+        
+        for (var id in this.robotMeshes) {
+            var robotObj = this.robotMeshes[id];
+            
+            if (robotObj.propellers) {
+                robotObj.propellers.forEach(p => p.rotation.y += 0.8);
+            }
+
+            // Strobe effect when carrying cargo
+            if (robotObj.metadata && robotObj.metadata.hasCargo) {
+                var intensity = Math.sin(now * 0.025) > 0.2 ? 8.0 : 0.2; 
+                
+                if (robotObj.cargoMesh) {
+                    robotObj.cargoMesh.rotation.y += 0.1;
+                }
+
+                robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(intensity);
+                
+            } else {
+                if (robotObj.metadata) {
+                    robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(1.5);
+                }
+            }
+        }
+    },
+
+    // Build visual drop-off zones with colored borders
     createDropOffZones: function() {
         for (let i = 0; i < 5; i++) {
             let colorHex = this.zoneColors[i % this.zoneColors.length];
@@ -97,8 +126,8 @@ window.warehouseVisualizer = {
         }
     },
 
+    // Build shelf meshes from obstacle data
     createMap: function (mapData) {
-        // Törlés duplikáció ellen
         mapData.obstacles.forEach(obs => {
             var existing = this.scene.getMeshByName("obs_" + obs.x + "_" + obs.y);
             if (existing) existing.dispose();
@@ -108,9 +137,6 @@ window.warehouseVisualizer = {
         shelfMat.diffuseColor = new BABYLON.Color3(0.15, 0.15, 0.2); 
         shelfMat.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3); 
         shelfMat.emissiveColor = new BABYLON.Color3(0, 0, 0); 
-        
-        // JAVÍTÁS: KIVETTÜK A 'shelfMat.freeze()' PARANCSOT!
-        // Ez okozta, hogy a polc nem váltott vissza feketére.
 
         mapData.obstacles.forEach(obs => {
             var shelf = BABYLON.MeshBuilder.CreateBox("obs_" + obs.x + "_" + obs.y, { 
@@ -129,95 +155,132 @@ window.warehouseVisualizer = {
         });
     },
 
-    createRobotMesh: function(id, colorHex) {
+    // Construct a drone mesh with propellers and cargo
+    createDroneMesh: function(id, colorHex) {
         var color = BABYLON.Color3.FromHexString(colorHex);
         
-        var body = BABYLON.MeshBuilder.CreateBox("body_" + id, { width: 0.8, depth: 0.8, height: 0.25 }, this.scene);
-        body.position.y = 0.15; 
-        
-        var bodyMat = new BABYLON.StandardMaterial("bodyMat_" + id, this.scene);
-        bodyMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1); 
-        body.material = bodyMat;
+        var root = new BABYLON.TransformNode("root_" + id, this.scene);
 
-        var core = BABYLON.MeshBuilder.CreateCylinder("core_" + id, { diameter: 0.5, height: 0.05 }, this.scene);
-        core.position.y = 0.13; 
-        core.parent = body;
+        var darkMetal = new BABYLON.StandardMaterial("darkMetal", this.scene);
+        darkMetal.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.15);
         
-        var coreMat = new BABYLON.StandardMaterial("coreMat_" + id, this.scene);
-        coreMat.emissiveColor = color.scale(1.5); 
-        coreMat.diffuseColor = new BABYLON.Color3(0,0,0);
-        core.material = coreMat;
+        var lightMat = new BABYLON.StandardMaterial("lightMat_" + id, this.scene);
+        lightMat.emissiveColor = color.scale(2.0); 
+        lightMat.diffuseColor = new BABYLON.Color3(0,0,0);
 
-        return { mesh: body };
+        var propMat = new BABYLON.StandardMaterial("propMat", this.scene);
+        propMat.diffuseColor = new BABYLON.Color3(0.8, 0.8, 0.9);
+        propMat.alpha = 0.6; 
+
+        var body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 0.4, height: 0.15 }, this.scene);
+        body.material = darkMetal;
+        body.parent = root;
+
+        var ring = BABYLON.MeshBuilder.CreateTorus("ring", { diameter: 0.45, thickness: 0.05 }, this.scene);
+        ring.material = lightMat;
+        ring.parent = root;
+
+        var arm1 = BABYLON.MeshBuilder.CreateBox("arm1", { width: 1.2, height: 0.05, depth: 0.1 }, this.scene);
+        arm1.rotation.y = Math.PI / 4;
+        arm1.material = darkMetal;
+        arm1.parent = root;
+        
+        var arm2 = arm1.clone("arm2");
+        arm2.rotation.y = -Math.PI / 4;
+        arm2.parent = root;
+
+        var propellers = [];
+        var positions = [
+            { x: 0.45, z: 0.45 }, { x: -0.45, z: -0.45 },
+            { x: 0.45, z: -0.45 }, { x: -0.45, z: 0.45 }
+        ];
+
+        positions.forEach((pos, idx) => {
+            var motor = BABYLON.MeshBuilder.CreateCylinder("motor"+idx, { diameter: 0.1, height: 0.1 }, this.scene);
+            motor.position.x = pos.x;
+            motor.position.z = pos.z;
+            motor.position.y = 0.05;
+            motor.material = darkMetal;
+            motor.parent = root;
+
+            var prop = BABYLON.MeshBuilder.CreateBox("prop"+idx, { width: 0.6, depth: 0.05, height: 0.01 }, this.scene);
+            prop.position.y = 0.06; 
+            prop.material = propMat;
+            prop.parent = motor; 
+            propellers.push(prop);
+        });
+
+        var cargo = BABYLON.MeshBuilder.CreateBox("cargo", { size: 0.35 }, this.scene);
+        cargo.position.y = -0.3; 
+        cargo.parent = root;
+        var cargoMat = new BABYLON.StandardMaterial("cargoMat", this.scene);
+        cargoMat.emissiveColor = new BABYLON.Color3(1, 1, 1); 
+        cargo.material = cargoMat;
+        cargo.isVisible = false; 
+
+        return { mesh: root, lightMat: lightMat, cargoMesh: cargo, propellers: propellers };
     },
 
+    // Sync robot state and interpolate positions
     updateRobots: function (robotsData) {
-        // Először lekapcsolunk minden polc-fényt
         this.clearShelfHighlights();
 
         robotsData.forEach(robot => {
             var robotObj = this.robotMeshes[robot.id];
 
             if (!robotObj) {
-                robotObj = this.createRobotMesh(robot.id, robot.colorHex);
-
-                this.shadowGenerator.addShadowCaster(robotObj.mesh); 
-                this.mirrorTexture.renderList.push(robotObj.mesh);   
-
-                var cargoBox = BABYLON.MeshBuilder.CreateBox("cargo_" + robot.id, { size: 0.5 }, this.scene);
-                cargoBox.parent = robotObj.mesh;
-                cargoBox.position.y = 0.4; 
-                
-                var cargoMat = new BABYLON.StandardMaterial("cargoMat", this.scene);
-                cargoMat.diffuseColor = new BABYLON.Color3(0.9, 0.9, 0.9); 
-                cargoBox.material = cargoMat;
-                
-                robotObj.cargoMesh = cargoBox;
-                this.shadowGenerator.addShadowCaster(cargoBox); 
-                this.mirrorTexture.renderList.push(cargoBox);
+                robotObj = this.createDroneMesh(robot.id, robot.colorHex);
+                robotObj.mesh.getChildMeshes().forEach(m => {
+                    this.shadowGenerator.addShadowCaster(m);
+                    this.mirrorTexture.renderList.push(m);
+                });
+                robotObj.metadata = { 
+                    baseColor: BABYLON.Color3.FromHexString(robot.colorHex),
+                    hasCargo: false 
+                };
 
                 this.robotMeshes[robot.id] = robotObj;
             }
 
-            var mesh = robotObj.mesh;
-            mesh.position.x = BABYLON.Scalar.Lerp(mesh.position.x, robot.x, 0.2);
-            mesh.position.z = BABYLON.Scalar.Lerp(mesh.position.z, robot.y, 0.2);
-            mesh.position.y = 0.15 + Math.sin(Date.now() * 0.01 + robot.id) * 0.005;
+            var root = robotObj.mesh;
+            
+            robotObj.metadata.hasCargo = robot.hasCargo;
+
+            var hoverHeight = 1.8 + Math.sin(Date.now() * 0.003 + robot.id) * 0.1;
+            root.position.x = BABYLON.Scalar.Lerp(root.position.x, robot.x, 0.15);
+            root.position.z = BABYLON.Scalar.Lerp(root.position.z, robot.y, 0.15);
+            root.position.y = BABYLON.Scalar.Lerp(root.position.y, hoverHeight, 0.1);
 
             if (robotObj.cargoMesh) {
                 robotObj.cargoMesh.isVisible = robot.hasCargo;
             }
 
-            // Ha van cél, felkapcsoljuk a fényt
             if (robot.currentTargetNode) {
                 this.highlightShelf(robot.currentTargetNode.x, robot.currentTargetNode.y, robot.colorHex);
             }
         });
     },
 
+    // Highlight target shelf with the robot's color
     highlightShelf: function(x, y, colorHex) {
         var shelfId = "obs_" + x + "_" + y;
         var shelfMesh = this.scene.getMeshByName(shelfId);
         
         if (shelfMesh) {
-            // Ha kell, klónozzuk az anyagot, hogy egyedileg színezhető legyen
             if (shelfMesh.material.name === "shelfMat") {
                 shelfMesh.material = shelfMesh.material.clone("highlightMat_" + x + "_" + y);
             }
             var color = BABYLON.Color3.FromHexString(colorHex);
             shelfMesh.material.emissiveColor = color.scale(0.8);
-            
-            // Hozzáadjuk a listához, hogy a következő körben le tudjuk kapcsolni
             this.highlightedShelves.push(shelfMesh);
         }
     },
 
+    // Reset shelf highlights to base material
     clearShelfHighlights: function() {
-        // Végigmegyünk az előző körben bekapcsolt polcokon és leoltjuk őket
         this.highlightedShelves.forEach(mesh => {
-            mesh.material.emissiveColor = new BABYLON.Color3(0, 0, 0); // Fekete = Kikapcsolva
+            mesh.material.emissiveColor = new BABYLON.Color3(0, 0, 0);
         });
-        // Lista ürítése
         this.highlightedShelves = [];
     }
 };

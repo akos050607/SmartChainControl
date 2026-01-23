@@ -67,7 +67,6 @@ public class SimulationManager
         {
             if (robot.State == "Idle")
             {
-                // JAVÍTÁS: Csak olyan polcot választunk, ami SZABAD (nincs más robot célpontjai közt)
                 var shelf = GetFreeRandomShelf(robot.Id);
                 
                 if (shelf != null)
@@ -159,7 +158,7 @@ public class SimulationManager
         else
         {
             robot.StuckTicks = 0; 
-            float speed = 0.2f;
+            float speed = 0.05f;
             float dx = target.X - robot.X;
             float dy = target.Y - robot.Y;
 
@@ -183,16 +182,13 @@ public class SimulationManager
         return robot.CurrentPath == null || robot.CurrentPath.Count == 0;
     }
 
-    // ÚJ FÜGGVÉNY: Csak olyan polcot ad vissza, amit más robot épp nem céloz
     private Obstacle? GetFreeRandomShelf(int myRobotId)
     {
         var shelves = Map.Obstacles.Where(o => o.Type == "Shelf").ToList();
-        // Véletlenszerű sorrend
         shelves = shelves.OrderBy(x => _random.Next()).ToList();
 
         foreach (var shelf in shelves)
         {
-            // Ellenőrizzük, hogy más robot (aki nem én vagyok) megy-e már ide
             bool isTaken = Robots.Any(r => r.Id != myRobotId && 
                                          r.CurrentTargetNode != null && 
                                          (int)r.CurrentTargetNode.X == shelf.X && 
@@ -200,7 +196,7 @@ public class SimulationManager
             
             if (!isTaken) return shelf;
         }
-        return null; // Nincs szabad polc
+        return null; 
     }
 
     private Position? GetWalkableNeighbor(int targetX, int targetY)

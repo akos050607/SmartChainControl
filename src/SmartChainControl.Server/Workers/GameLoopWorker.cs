@@ -14,10 +14,10 @@ public class GameLoopWorker : BackgroundService
     {
         _simulationManager = simulationManager;
         _hubContext = hubContext;
-        _timer = new PeriodicTimer(TimeSpan.FromMilliseconds(50));
+        _timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
     }
 
-    // Main game loop running at 20 FPS (50ms intervals)
+    // Main game loop running at 60 FPS
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (await _timer.WaitForNextTickAsync(stoppingToken) && !stoppingToken.IsCancellationRequested)
