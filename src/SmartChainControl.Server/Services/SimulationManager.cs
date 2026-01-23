@@ -43,17 +43,16 @@ public class SimulationManager
         {
             for (int y = 2; y < MapHeight - 2; y++)
             {
-                if (y == 10) continue;
+                if (y == 10) continue; 
                 map.Obstacles.Add(new Obstacle { X = x, Y = y, Type = "Shelf" });
             }
         }
         return map;
     }
 
-    // Main simulation update tick - handles robot state machines and movement
     public void Update()
     {
-        // Collect current robot positions for collision detection
+        // Initialize occupied cells with current robot positions for collision detection
         var occupiedCells = new HashSet<(int, int)>();
         foreach (var r in Robots) 
         {
@@ -62,7 +61,7 @@ public class SimulationManager
 
         foreach (var robot in Robots)
         {
-            // Robot state machine: Idle -> ToShelf -> Loading -> ToExit
+            // State machine: Idle -> ToShelf -> Loading -> ToExit
             if (robot.State == "Idle")
             {
                 var shelf = GetRandomShelf();
@@ -74,7 +73,6 @@ public class SimulationManager
                     robot.TargetX = entryPoint.X;
                     robot.TargetY = entryPoint.Y;
                     robot.StuckTicks = 0;
-                    
                     robot.PatienceThreshold = _random.Next(5, 20); 
 
                     var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
@@ -90,9 +88,9 @@ public class SimulationManager
             {
                 robot.State = "Loading";
                 robot.HasCargo = true;
-                robot.TargetX = 0;
-                robot.TargetY = robot.Id * 2;
-                robot.CurrentTargetNode = null;
+                robot.TargetX = 0; 
+                robot.TargetY = robot.Id * 2; 
+                robot.CurrentTargetNode = null; 
                 robot.StuckTicks = 0;
 
                 var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
@@ -102,17 +100,17 @@ public class SimulationManager
             else if (robot.State == "ToExit" && IsPathFinished(robot))
             {
                 robot.HasCargo = false;
-                robot.State = "Idle";
+                robot.State = "Idle"; 
             }
 
-            // Move robot along path with collision avoidance
+            // Execute robot movement along path
             MoveRobot(robot, occupiedCells);
         }
     }
 
     private void MoveRobot(Robot robot, HashSet<(int, int)> occupiedCells)
     {
-        // Remove already-reached waypoints from path
+        // Remove reached waypoints from path
         while (robot.CurrentPath != null && robot.CurrentPath.Count > 0)
         {
             var nextNode = robot.CurrentPath[0];
@@ -126,14 +124,16 @@ public class SimulationManager
         if (robot.CurrentPath == null || robot.CurrentPath.Count == 0) return;
 
         var target = robot.CurrentPath[0];
+        var targetCell = ((int)target.X, (int)target.Y);
         
-        bool isBlocked = occupiedCells.Contains(((int)target.X, (int)target.Y));
+        // Check if target cell is occupied by another robot
+        bool isBlocked = occupiedCells.Contains(targetCell);
 
         if (isBlocked)
         {
             robot.StuckTicks++;
 
-            // Replan path after patience threshold exceeded
+            // Replan path when deadlock threshold exceeded
             if (robot.StuckTicks > robot.PatienceThreshold)
             {
                 var otherRobotsAsObstacles = new HashSet<(int, int)>(occupiedCells);
@@ -143,7 +143,7 @@ public class SimulationManager
                     (int)Math.Round(robot.Y), 
                     (int)robot.TargetX, 
                     (int)robot.TargetY, 
-                    otherRobotsAsObstacles
+                    otherRobotsAsObstacles 
                 );
 
                 if (newPath != null)
@@ -154,17 +154,14 @@ public class SimulationManager
                 }
                 else
                 {
-                    // No path found, increase patience and wait
                     robot.PatienceThreshold += 5;
                 }
             }
         }
         else
         {
-            // Path is clear, move robot toward next waypoint
+            // Path is clear, move robot toward target
             robot.StuckTicks = 0;
-
-            occupiedCells.Remove(((int)Math.Round(robot.X), (int)Math.Round(robot.Y)));
 
             float speed = 0.2f;
             float dx = target.X - robot.X;
@@ -181,6 +178,8 @@ public class SimulationManager
                 robot.Y += Math.Sign(dy) * speed;
             }
 
+            // Register target cell and current position as occupied
+            occupiedCells.Add(targetCell);
             occupiedCells.Add(((int)Math.Round(robot.X), (int)Math.Round(robot.Y)));
         }
     }
