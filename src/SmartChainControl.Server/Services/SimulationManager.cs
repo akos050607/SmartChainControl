@@ -16,6 +16,8 @@ public class SimulationManager
         "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF" 
     };
 
+    private Dictionary<int, (int X, int Y)> _dropOffZones = new();
+
     public SimulationManager()
     {
         Map = GenerateWarehouseMap();
@@ -23,11 +25,14 @@ public class SimulationManager
 
         for (int i = 0; i < 5; i++)
         {
+            int startY = 2 + (i * 3);
+            _dropOffZones.Add(i + 1, (0, startY));
+
             Robots.Add(new Robot
             {
                 Id = i + 1,
                 X = 0, 
-                Y = (i + 1) * 2,
+                Y = startY, 
                 ColorHex = _robotColors[i % _robotColors.Length],
                 State = "Idle",
                 CurrentPath = new List<Position>(),
@@ -52,7 +57,6 @@ public class SimulationManager
 
     public void Update()
     {
-        // Initialize occupied cells with current robot positions for collision detection
         var occupiedCells = new HashSet<(int, int)>();
         foreach (var r in Robots) 
         {
@@ -61,7 +65,6 @@ public class SimulationManager
 
         foreach (var robot in Robots)
         {
-            // State machine: Idle -> ToShelf -> Loading -> ToExit
             if (robot.State == "Idle")
             {
                 var shelf = GetRandomShelf();
@@ -88,8 +91,11 @@ public class SimulationManager
             {
                 robot.State = "Loading";
                 robot.HasCargo = true;
-                robot.TargetX = 0; 
-                robot.TargetY = robot.Id * 2; 
+                
+                var myZone = _dropOffZones[robot.Id];
+                robot.TargetX = myZone.X;
+                robot.TargetY = myZone.Y;
+                
                 robot.CurrentTargetNode = null; 
                 robot.StuckTicks = 0;
 
@@ -103,14 +109,12 @@ public class SimulationManager
                 robot.State = "Idle"; 
             }
 
-            // Execute robot movement along path
             MoveRobot(robot, occupiedCells);
         }
     }
 
     private void MoveRobot(Robot robot, HashSet<(int, int)> occupiedCells)
     {
-        // Remove reached waypoints from path
         while (robot.CurrentPath != null && robot.CurrentPath.Count > 0)
         {
             var nextNode = robot.CurrentPath[0];
@@ -126,14 +130,11 @@ public class SimulationManager
         var target = robot.CurrentPath[0];
         var targetCell = ((int)target.X, (int)target.Y);
         
-        // Check if target cell is occupied by another robot
         bool isBlocked = occupiedCells.Contains(targetCell);
 
         if (isBlocked)
         {
             robot.StuckTicks++;
-
-            // Replan path when deadlock threshold exceeded
             if (robot.StuckTicks > robot.PatienceThreshold)
             {
                 var otherRobotsAsObstacles = new HashSet<(int, int)>(occupiedCells);
@@ -160,9 +161,7 @@ public class SimulationManager
         }
         else
         {
-            // Path is clear, move robot toward target
-            robot.StuckTicks = 0;
-
+            robot.StuckTicks = 0; 
             float speed = 0.2f;
             float dx = target.X - robot.X;
             float dy = target.Y - robot.Y;
@@ -177,8 +176,6 @@ public class SimulationManager
                 robot.X += Math.Sign(dx) * speed;
                 robot.Y += Math.Sign(dy) * speed;
             }
-
-            // Register target cell and current position as occupied
             occupiedCells.Add(targetCell);
             occupiedCells.Add(((int)Math.Round(robot.X), (int)Math.Round(robot.Y)));
         }
