@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace SmartChainControl.Shared.Models
 {
     public class Robot
@@ -14,12 +16,12 @@ namespace SmartChainControl.Shared.Models
 
         public Position? CurrentTargetNode { get; set; }
 
-        public float Rotation { get; set; }
-
         public string State { get; set; } = "Idle";
 
         public string ColorHex { get; set; } = "#00FF00";
 
         public bool HasCargo { get; set; }
+
+        public int StuckTicks { get; set; } = 0;
     }
 }

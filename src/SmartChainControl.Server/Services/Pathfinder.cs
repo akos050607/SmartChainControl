@@ -34,9 +34,9 @@ namespace SmartChainControl.Server.Services
             }
         }
 
-        public List<Position>? FindPath(int startX, int startY, int targetX, int targetY)
+        public List<Position>? FindPath(int startX, int startY, int targetX, int targetY, HashSet<(int, int)>? dynamicObstacles = null)
         {
-            if (IsWall(targetX, targetY)) return null;
+            if (IsWall(targetX, targetY, null)) return null;
 
             var openList = new List<Node>();
             var closedList = new HashSet<(int, int)>();
@@ -58,7 +58,8 @@ namespace SmartChainControl.Server.Services
                 foreach (var neighbor in GetNeighbors(current))
                 {
                     if (closedList.Contains((neighbor.X, neighbor.Y))) continue;
-                    if (IsWall(neighbor.X, neighbor.Y)) continue;
+                    
+                    if (IsWall(neighbor.X, neighbor.Y, dynamicObstacles)) continue;
 
                     var existingNode = openList.FirstOrDefault(n => n.X == neighbor.X && n.Y == neighbor.Y);
                     if (existingNode == null)
@@ -79,7 +80,18 @@ namespace SmartChainControl.Server.Services
             return null;
         }
 
-        private List<Position> ReconstructPath(Node node)
+        private bool IsWall(int x, int y, HashSet<(int, int)>? dynamicObstacles)
+        {
+            if (x < 0 || x >= _width || y < 0 || y >= _height) return true;
+            
+            if (_collisionMap[x, y]) return true;
+
+            if (dynamicObstacles != null && dynamicObstacles.Contains((x, y))) return true;
+
+            return false;
+        }
+
+        private List<Position> ReconstructPath(Node? node)
         {
             var path = new List<Position>();
             while (node != null)
@@ -102,12 +114,6 @@ namespace SmartChainControl.Server.Services
             };
 
             return neighbors.Where(n => n.X >= 0 && n.X < _width && n.Y >= 0 && n.Y < _height);
-        }
-
-        private bool IsWall(int x, int y)
-        {
-            if (x < 0 || x >= _width || y < 0 || y >= _height) return true;
-            return _collisionMap[x, y];
         }
     }
     
