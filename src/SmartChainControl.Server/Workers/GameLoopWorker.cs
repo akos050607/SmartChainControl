@@ -17,6 +17,7 @@ public class GameLoopWorker : BackgroundService
         _timer = new PeriodicTimer(TimeSpan.FromMilliseconds(50));
     }
 
+    // Main game loop running at 20 FPS (50ms intervals)
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (await _timer.WaitForNextTickAsync(stoppingToken) && !stoppingToken.IsCancellationRequested)

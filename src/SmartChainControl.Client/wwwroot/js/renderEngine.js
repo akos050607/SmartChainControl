@@ -4,6 +4,7 @@ window.warehouseVisualizer = {
     scene: null,
     robotMeshes: {},
 
+    // Initialize Babylon.js 3D scene with camera, lighting, and ground plane
     init: function (canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.engine = new BABYLON.Engine(this.canvas, true);
@@ -35,8 +36,8 @@ window.warehouseVisualizer = {
         });
     },
 
+    // Generate 3D shelf meshes from map obstacle data
     createMap: function (mapData) {
-        
         mapData.obstacles.forEach(obs => {
             var shelf = BABYLON.MeshBuilder.CreateBox("obs_" + obs.x + "_" + obs.y, { 
                 width: 1, 
@@ -57,12 +58,14 @@ window.warehouseVisualizer = {
 
     highlightedShelves: {},
 
+    // Update robot positions and cargo visibility with smooth interpolation
     updateRobots: function (robotsData) {
         this.clearShelfHighlights();
 
         robotsData.forEach(robot => {
             var mesh = this.robotMeshes[robot.id];
 
+            // Create robot mesh with cargo box on first encounter
             if (!mesh) {
                 mesh = BABYLON.MeshBuilder.CreateBox("robot_" + robot.id, { size: 0.8 }, this.scene);
                 var mat = new BABYLON.StandardMaterial("mat_" + robot.id, this.scene);
@@ -78,7 +81,7 @@ window.warehouseVisualizer = {
                 cargoMat.emissiveColor = new BABYLON.Color3(0, 0.5, 0);
                 cargoBox.material = cargoMat;
                 cargoBox.isVisible = false;
-                mesh.cargoMesh = cargoBox; 
+                mesh.cargoMesh = cargoBox;
 
                 this.robotMeshes[robot.id] = mesh;
             }
@@ -96,6 +99,7 @@ window.warehouseVisualizer = {
         });
     },
 
+    // Highlight target shelf with robot's color
     highlightShelf: function(x, y, colorHex) {
         var shelfId = "obs_" + x + "_" + y;
         var shelfMesh = this.scene.getMeshByName(shelfId);
@@ -109,7 +113,7 @@ window.warehouseVisualizer = {
     clearShelfHighlights: function() {
         for (var id in this.highlightedShelves) {
             var mesh = this.highlightedShelves[id];
-            mesh.material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.15); 
+            mesh.material.emissiveColor = new BABYLON.Color3(0.1, 0.1, 0.15);
         }
         this.highlightedShelves = {};
     }

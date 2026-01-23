@@ -8,17 +8,17 @@ namespace SmartChainControl.Server.Services
         private readonly int _width;
         private readonly int _height;
 
-        // Node class for A* algorithm
         private class Node
         {
             public int X { get; set; }
             public int Y { get; set; }
             public Node? Parent { get; set; }
-            public int G { get; set; } // Distance from start
-            public int H { get; set; } // Estimated distance to target
-            public int F => G + H;     // Cost
+            public int G { get; set; }
+            public int H { get; set; }
+            public int F => G + H;
         }
 
+        // Initialize pathfinder with map data and build collision matrix
         public Pathfinder(MapInfo map)
         {
             _width = map.Width;
@@ -34,6 +34,7 @@ namespace SmartChainControl.Server.Services
             }
         }
 
+        // A* pathfinding algorithm with optional dynamic obstacle avoidance
         public List<Position>? FindPath(int startX, int startY, int targetX, int targetY, HashSet<(int, int)>? dynamicObstacles = null)
         {
             if (IsWall(targetX, targetY, null)) return null;
@@ -47,6 +48,7 @@ namespace SmartChainControl.Server.Services
             {
                 var current = openList.OrderBy(n => n.F).First();
 
+                // Target reached, reconstruct and return path
                 if (current.X == targetX && current.Y == targetY)
                 {
                     return ReconstructPath(current);
@@ -107,10 +109,10 @@ namespace SmartChainControl.Server.Services
         {
             var neighbors = new List<Node>
             {
-                new Node { X = node.X, Y = node.Y - 1 }, // Up
-                new Node { X = node.X, Y = node.Y + 1 }, // Down
-                new Node { X = node.X - 1, Y = node.Y }, // Left
-                new Node { X = node.X + 1, Y = node.Y }  // Right
+                new Node { X = node.X, Y = node.Y - 1 },
+                new Node { X = node.X, Y = node.Y + 1 },
+                new Node { X = node.X - 1, Y = node.Y },
+                new Node { X = node.X + 1, Y = node.Y }
             };
 
             return neighbors.Where(n => n.X >= 0 && n.X < _width && n.Y >= 0 && n.Y < _height);
