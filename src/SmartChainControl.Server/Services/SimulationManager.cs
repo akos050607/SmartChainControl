@@ -67,23 +67,27 @@ public class SimulationManager
         {
             if (robot.State == "Idle")
             {
-                var shelf = GetRandomShelf();
-                var entryPoint = GetWalkableNeighbor(shelf.X, shelf.Y);
-
-                if (entryPoint != null)
+                // JAVÍTÁS: Csak olyan polcot választunk, ami SZABAD (nincs más robot célpontjai közt)
+                var shelf = GetFreeRandomShelf(robot.Id);
+                
+                if (shelf != null)
                 {
-                    robot.CurrentTargetNode = new Position { X = shelf.X, Y = shelf.Y };
-                    robot.TargetX = entryPoint.X;
-                    robot.TargetY = entryPoint.Y;
-                    robot.StuckTicks = 0;
-                    robot.PatienceThreshold = _random.Next(5, 20); 
-
-                    var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
-                    
-                    if (path != null && path.Count > 0)
+                    var entryPoint = GetWalkableNeighbor(shelf.X, shelf.Y);
+                    if (entryPoint != null)
                     {
-                        robot.CurrentPath = path;
-                        robot.State = "ToShelf";
+                        robot.CurrentTargetNode = new Position { X = shelf.X, Y = shelf.Y };
+                        robot.TargetX = entryPoint.X;
+                        robot.TargetY = entryPoint.Y;
+                        robot.StuckTicks = 0;
+                        robot.PatienceThreshold = _random.Next(5, 20); 
+
+                        var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
+                        
+                        if (path != null && path.Count > 0)
+                        {
+                            robot.CurrentPath = path;
+                            robot.State = "ToShelf";
+                        }
                     }
                 }
             }
@@ -138,14 +142,7 @@ public class SimulationManager
             if (robot.StuckTicks > robot.PatienceThreshold)
             {
                 var otherRobotsAsObstacles = new HashSet<(int, int)>(occupiedCells);
-                
-                var newPath = _pathfinder.FindPath(
-                    (int)Math.Round(robot.X), 
-                    (int)Math.Round(robot.Y), 
-                    (int)robot.TargetX, 
-                    (int)robot.TargetY, 
-                    otherRobotsAsObstacles 
-                );
+                var newPath = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY, otherRobotsAsObstacles);
 
                 if (newPath != null)
                 {
@@ -186,21 +183,32 @@ public class SimulationManager
         return robot.CurrentPath == null || robot.CurrentPath.Count == 0;
     }
 
-    private Obstacle GetRandomShelf()
+    // ÚJ FÜGGVÉNY: Csak olyan polcot ad vissza, amit más robot épp nem céloz
+    private Obstacle? GetFreeRandomShelf(int myRobotId)
     {
         var shelves = Map.Obstacles.Where(o => o.Type == "Shelf").ToList();
-        if (shelves.Count == 0) return new Obstacle { X = 5, Y = 5 };
-        return shelves[_random.Next(shelves.Count)];
+        // Véletlenszerű sorrend
+        shelves = shelves.OrderBy(x => _random.Next()).ToList();
+
+        foreach (var shelf in shelves)
+        {
+            // Ellenőrizzük, hogy más robot (aki nem én vagyok) megy-e már ide
+            bool isTaken = Robots.Any(r => r.Id != myRobotId && 
+                                         r.CurrentTargetNode != null && 
+                                         (int)r.CurrentTargetNode.X == shelf.X && 
+                                         (int)r.CurrentTargetNode.Y == shelf.Y);
+            
+            if (!isTaken) return shelf;
+        }
+        return null; // Nincs szabad polc
     }
 
     private Position? GetWalkableNeighbor(int targetX, int targetY)
     {
         var neighbors = new List<(int x, int y)> 
         { 
-            (targetX - 1, targetY), 
-            (targetX + 1, targetY) 
+            (targetX - 1, targetY), (targetX + 1, targetY) 
         };
-
         neighbors = neighbors.OrderBy(x => _random.Next()).ToList();
 
         foreach (var n in neighbors)
