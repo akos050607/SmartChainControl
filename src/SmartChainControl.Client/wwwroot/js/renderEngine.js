@@ -5,11 +5,12 @@ window.warehouseVisualizer = {
     robotMeshes: {}, 
     shadowGenerator: null,
     mirrorTexture: null, 
+    dotNetHelper: null,
     
     zoneColors: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF"],
 
-    // Initialize scene, camera, lights, ground, and render loop
-    init: function (canvasId) {
+    init: function (canvasId, dotNetHelper) {
+        this.dotNetHelper = dotNetHelper;
         this.robotMeshes = {}; 
         this.highlightedShelves = [];
 
@@ -28,6 +29,28 @@ window.warehouseVisualizer = {
         camera.wheelPrecision = 50;
         camera.minZ = 0.5;
 
+        this.scene.onPointerDown = (evt, pickResult) => {
+            if (pickResult.hit && pickResult.pickedMesh) {
+                var mesh = pickResult.pickedMesh;
+                var root = mesh;
+                
+                while (root.parent) {
+                    root = root.parent;
+                }
+
+                if (root.name && root.name.startsWith("root_")) {
+                    var idString = root.name.split("_")[1];
+                    var id = parseInt(idString);
+                    
+                    console.log("Robot clicked: " + id);
+                    
+                    if (this.dotNetHelper) {
+                        this.dotNetHelper.invokeMethodAsync("SelectRobotFromJS", id);
+                    }
+                }
+            }
+        };
+
         var hemiLight = new BABYLON.HemisphericLight("hemiLight", new BABYLON.Vector3(0, 1, 0), this.scene);
         hemiLight.intensity = 0.4; 
 
@@ -39,6 +62,7 @@ window.warehouseVisualizer = {
         this.shadowGenerator.useBlurExponentialShadowMap = true;
         this.shadowGenerator.blurKernel = 16; 
 
+        // Tükröződés
         var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, this.scene);
         ground.position.x = 10;
         ground.position.z = 10;
@@ -56,7 +80,6 @@ window.warehouseVisualizer = {
 
         this.createDropOffZones();
 
-        // Main render loop: animate drones and render scene
         this.engine.runRenderLoop(() => {
             if (this.scene && this.scene.activeCamera) {
                 this.animateDrones(); 
@@ -69,7 +92,6 @@ window.warehouseVisualizer = {
         });
     },
 
-    // Animate drones: propellers, strobe when carrying cargo, gentle hover
     animateDrones: function() {
         var now = Date.now();
         
@@ -80,7 +102,6 @@ window.warehouseVisualizer = {
                 robotObj.propellers.forEach(p => p.rotation.y += 0.8);
             }
 
-            // Strobe effect when carrying cargo
             if (robotObj.metadata && robotObj.metadata.hasCargo) {
                 var intensity = Math.sin(now * 0.025) > 0.2 ? 8.0 : 0.2; 
                 
@@ -98,7 +119,6 @@ window.warehouseVisualizer = {
         }
     },
 
-    // Build visual drop-off zones with colored borders
     createDropOffZones: function() {
         for (let i = 0; i < 5; i++) {
             let colorHex = this.zoneColors[i % this.zoneColors.length];
@@ -126,7 +146,6 @@ window.warehouseVisualizer = {
         }
     },
 
-    // Build shelf meshes from obstacle data
     createMap: function (mapData) {
         mapData.obstacles.forEach(obs => {
             var existing = this.scene.getMeshByName("obs_" + obs.x + "_" + obs.y);
@@ -155,7 +174,6 @@ window.warehouseVisualizer = {
         });
     },
 
-    // Construct a drone mesh with propellers and cargo
     createDroneMesh: function(id, colorHex) {
         var color = BABYLON.Color3.FromHexString(colorHex);
         
@@ -175,6 +193,10 @@ window.warehouseVisualizer = {
         var body = BABYLON.MeshBuilder.CreateCylinder("body", { diameter: 0.4, height: 0.15 }, this.scene);
         body.material = darkMetal;
         body.parent = root;
+
+        var hitBox = BABYLON.MeshBuilder.CreateBox("hitbox_" + id, {size: 1.5}, this.scene);
+        hitBox.parent = root;
+        hitBox.isVisible = false; 
 
         var ring = BABYLON.MeshBuilder.CreateTorus("ring", { diameter: 0.45, thickness: 0.05 }, this.scene);
         ring.material = lightMat;
@@ -221,7 +243,6 @@ window.warehouseVisualizer = {
         return { mesh: root, lightMat: lightMat, cargoMesh: cargo, propellers: propellers };
     },
 
-    // Sync robot state and interpolate positions
     updateRobots: function (robotsData) {
         this.clearShelfHighlights();
 
@@ -247,9 +268,9 @@ window.warehouseVisualizer = {
             robotObj.metadata.hasCargo = robot.hasCargo;
 
             var hoverHeight = 1.8 + Math.sin(Date.now() * 0.003 + robot.id) * 0.1;
-            root.position.x = BABYLON.Scalar.Lerp(root.position.x, robot.x, 0.15);
-            root.position.z = BABYLON.Scalar.Lerp(root.position.z, robot.y, 0.15);
-            root.position.y = BABYLON.Scalar.Lerp(root.position.y, hoverHeight, 0.1);
+            root.position.x = BABYLON.Scalar.Lerp(root.position.x, robot.x, 0.2);
+            root.position.z = BABYLON.Scalar.Lerp(root.position.z, robot.y, 0.2);
+            root.position.y = BABYLON.Scalar.Lerp(root.position.y, hoverHeight, 0.4);
 
             if (robotObj.cargoMesh) {
                 robotObj.cargoMesh.isVisible = robot.hasCargo;
@@ -261,7 +282,6 @@ window.warehouseVisualizer = {
         });
     },
 
-    // Highlight target shelf with the robot's color
     highlightShelf: function(x, y, colorHex) {
         var shelfId = "obs_" + x + "_" + y;
         var shelfMesh = this.scene.getMeshByName(shelfId);
@@ -276,7 +296,6 @@ window.warehouseVisualizer = {
         }
     },
 
-    // Reset shelf highlights to base material
     clearShelfHighlights: function() {
         this.highlightedShelves.forEach(mesh => {
             mesh.material.emissiveColor = new BABYLON.Color3(0, 0, 0);

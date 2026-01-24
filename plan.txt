@@ -1,0 +1,162 @@
+1. A Látványvilág: WebGL és Cyberpunk Esztétika
+Mivel Blazor WebAssembly-t használsz, a böngészőben futsz. A sima HTML/CSS nem lesz elég a "brutális" látványhoz.
+
+Használj 3D-t (Babylon.js vagy Three.js):
+
+Ne 2D rácsot használj! Integráld a Blazor-t a Babylon.js-szel (mivel ennek van a legjobb TypeScript/.NET támogatása) vagy Three.js-szel JS Interopon keresztül.
+
+A raktár legyen egy 3D-s tér, izometrikus vagy szabad kameranézettel.
+
+Sci-Fi / "Tron" Stílus:
+
+A padló legyen sötét, tükröződő felület.
+
+A robotok (AGV-k) legyenek neonfénnyel világító egységek. A színük jelezze az állapotukat (Zöld: szabad, Kék: szállít, Piros: hiba/ütközésveszély, Arany: High Priority).
+
+Bloom Effect: Használj "glow" effekteket (utófeldolgozás), hogy a fények "égjenek" a képernyőn.
+
+Partidő és Trail Effektek:
+
+Amikor a robot mozog, húzzon maga után egy "fénysávot" (mint a Tron motoroknál), ami lassan elhalványul. Ez vizuálisan megmutatja az útvonalat.
+
+Amikor egy csomagot felvesznek, legyen egy látványos "transzportálás" vagy hologram effektus.
+
+2. A "Brain": Multi-Agent Pathfinding (MAPF)
+A "maguktól oldják meg" rész a legnehezebb, de ez adja el a rendszert.
+
+Algoritmus: Ne sima A* (A-Star) algoritmust használj, mert azzal a robotok egymásba mennek.
+
+Használd a Cooperative A (CA)** vagy a Conflict-Based Search (CBS) algoritmust.
+
+A szerver (.NET 9) számolja ki a nagy útvonalakat, a kliensek pedig csak interpolálnak (simítják a mozgást).
+
+Dinamikus Újratervezés:
+
+Ha a felhasználó lerak egy akadályt vagy egy új robotot, a rendszernek azonnal (real-time) újra kell kalkulálnia a többi robot útvonalát, hogy elkerüljék az ütközést. Ez a "rajintelligencia" vizuálisan gyönyörű, ahogy egyszerre kikerülik az új akadályt.
+
+3. Teljesítmény és Adatkommunikáció (A sebesség a látvány része)
+A "zero-latency" érzethez trükközni kell.
+
+MessagePack a JSON helyett: A SignalR alapból JSON-t küld. Válts át MessagePack protokollra (bináris szerializáció). Ez sokkal kisebb adatcsomagokat jelent, így másodpercenként akár 60-szor is frissítheted a pozíciókat akadozás nélkül.
+
+Interpoláció a Kliensen:
+
+A szerver ne küldjön minden milliszekundumban pozíciót. Küldje azt: "Robot 1 elindult A-ból B-be, sebesség: X".
+
+A Blazor kliens (vagy a JS render loop) számolja ki a két pont közötti fázisokat. Így, ha a net megdöccen, a robot akkor is simán csúszik tovább a képernyőn.
+
+4. Interaktivitás és Gamification (A Felhasználói Élmény)
+Hogy a felhasználó úgy érezze, ő az "Isten" a raktár felett:
+
+God Mode UI:
+
+Egy lebegő, áttetsző (glassmorphism) panelen lehessen "drag-and-drop" módszerrel új polcokat vagy akadályokat behúzni.
+
+Katasztrófa gomb: Egy gomb, ami túlterhelést szimulál (pl. 500 rendelés egyszerre), hogy a néző lássa, hogyan kezeli a raj a káoszt.
+
+High Priority Visuals:
+
+Ha valaki "High Priority" rendelést ad le, a robot váltson szín (pl. lángoló narancs), a többi robot pedig látványosan húzódjon félre (lassítson vagy álljon meg), hogy elengedje a fontos csomagot.
+
+5. Weboldalra Integrálás
+Mivel ez egy Blazor WebAssembly app, könnyen beágyazható, de van egy elegánsabb megoldás az iframe-nél.
+
+Blazor Custom Elements:
+
+A .NET 9 támogatja, hogy a Blazor komponensedet szabványos HTML Custom Elementként (Web Component) exportáld.
+
+Így a weboldalon csak ennyit kell beírni: <smart-chain-control warehouse-id="123"></smart-chain-control>, és működik is React, Angular, vagy sima HTML oldalon belül is.
+
+SmartChainControl/
+├── .github/                     # GitHub Actions (CI/CD) workflow-k
+│   └── workflows/
+│       └── dotnet-build.yml     # Automata build ellenőrzés
+├── docs/                        # Dokumentáció és screenshotok a README-hez
+│   └── architecture_diagram.png
+├── src/                         # A forráskód gyökere
+│   ├── SmartChainControl.Shared/    # 1. KÖZÖS PROJEKT (Class Library)
+│   │   ├── Models/              # Adatstruktúrák (amik utaznak a hálózaton)
+│   │   │   ├── Robot.cs
+│   │   │   ├── Position.cs
+│   │   │   ├── GridCell.cs
+│   │   │   └── WarehouseConfig.cs
+│   │   ├── Enums/               # Állapotok
+│   │   │   ├── RobotState.cs    # (Idle, Moving, Error, Charging)
+│   │   │   └── PriorityLevel.cs
+│   │   └── SmartChainControl.Shared.csproj
+│   │
+│   ├── SmartChainControl.Server/    # 2. SZERVER PROJEKT (ASP.NET Core API)
+│   │   ├── Controllers/         # Hagyományos REST API végpontok (ha kell)
+│   │   ├── Hubs/                # SignalR kommunikáció
+│   │   │   └── WarehouseHub.cs  # Itt csatlakoznak a kliensek
+│   │   ├── Services/            # Az üzleti logika
+│   │   │   ├── SimulationManager.cs # Singleton állapotkezelő
+│   │   │   └── Pathfinding/     # Útvonaltervezés
+│   │   │       ├── AStar.cs
+│   │   │       └── ConflictResolver.cs
+│   │   ├── Workers/             # Háttérfolyamatok
+│   │   │   └── GameLoopWorker.cs # A végtelen ciklus (Heartbeat)
+│   │   ├── Program.cs           # Dependency Injection beállítások
+│   │   └── SmartChainControl.Server.csproj
+│   │
+│   └── SmartChainControl.Client/    # 3. KLIENS PROJEKT (Blazor WebAssembly)
+│       ├── wwwroot/             # Statikus fájlok
+│       │   ├── css/             # Stílusok (neon effektek)
+│       │   ├── js/              # JavaScript fájlok
+│       │   │   └── renderEngine.js # Babylon.js kód
+│       │   ├── assets/          # Textúrák, 3D modellek, hangok
+│       │   └── index.html
+│       ├── Pages/               # Blazor oldalak
+│       │   └── Dashboard.razor  # A fő nézet
+│       ├── Components/          # Újrafelhasználható elemek
+│       │   ├── WarehouseCanvas.razor # A 3D nézet konténere
+│       │   └── ControlPanel.razor    # Gombok, irányítás
+│       ├── Engine/              # C# logikai réteg a frontendhez
+│       │   └── BabylonInterop.cs # C# -> JS híd
+│       ├── Program.cs
+│       └── SmartChainControl.Client.csproj
+│
+├── tests/                       # Tesztek (ha profi akarsz lenni)
+│   └── SmartChainControl.Tests/
+├── .gitignore                   # Hogy ne tölts fel felesleges fájlokat (bin/obj)
+├── LICENSE                      # Pl. MIT License
+├── README.md                    # A projekt leírása (nagyon fontos!)
+└── SmartChainControl.sln        # Visual Studio Solution fájl
+
+2. UI / UX (A "Control Room" érzés)
+A jelenlegi fehér fejléc és a lila Blazor menü "megöli" a hangulatot. Integráld a UI-t a 3D térbe.
+
+Glassmorphism / HUD stílus: Felejtsd el a bal oldali standard menüt. Lebegő paneleket használj (félig átlátszó, sötét háttérrel, elmosódással), mintha egy űrhajó vagy egy biztonsági központ irányítópultja lenne.
+
+Adatvizualizáció: Ha rákattintasz egy robotra, ugorjon fel egy kis ablak a feje fölött (vagy oldalt) a státuszával: Battery Level, Current Task, Speed, LoadID.
+
+Minimap: A képernyő sarkába tegyél egy 2D-s felülnézeti térképet (radar), ami mutatja a pontokat.
+
+3. Animáció és Mozgás (A "Flow")
+A mozgás legyen organikus, ne csak koordináta-ugrás.
+
+Lerping (Linear Interpolation): A robotok mozgása legyen sima. Ne ugorjanak egyik gridről a másikra, hanem csússzanak át.
+
+Dőlés és gyorsulás: Amikor a robot elindul, gyorsuljon fel. Amikor kanyarodik, egy picit dőljön be a kanyar irányába, mint egy drón vagy egy gyors autó. Ez rengeteg életet visz bele.
+
+Trail Renderer (Fénycsóva): A robotok húzzanak maguk után egy halvány fénycsíkot (mint a Tron filmekben), ami pár másodperc után elhalványul. Ez vizuálisan is mutatja az útvonalat.
+
+4. Backend & Logika (A "Brains")
+Hogy ne csak szép legyen, hanem okos is.
+
+Pathfinding Vizualizáció: Mielőtt a robot elindul, rajzold ki a tervezett útvonalát egy vékony vonallal a padlóra. Ha backend oldalon (pl. A* algoritmussal) számolsz, küldd le az útvonal pontjait a kliensnek.
+
+Heatmap (Hőtérkép): Legyen egy gomb, amivel bekapcsolhatsz egy hőtérképet a padlón: hol járnak a leggyakrabban a robotok? Ahol sűrű a forgalom, ott legyen vörös a padló.
+
+Ütközés-elkerülés (Collision Avoidance): Ha két robot útja keresztezi egymást, az egyik lassítson le vagy álljon meg. Ezt leprogramozni és látni, ahogy "udvariasak" egymással, nagyon menő.
+
+SignalR: (Feltételezem, használod, de ha nem:) Minden mozgás legyen valós idejű szerver-kliens kommunikációval vezérelve. Ne a kliens találja ki, mi történik, ő csak megjelenítse a szerver "igazságát".
+
+5. Extra "Showcase" elemek
+Kamerakezelés: Ne fix legyen a kamera.
+
+Free cam: Irányítható egérrel.
+
+Follow cam: Rákattintasz egy robotra, és a kamera követi őt közelről.
+
+Részecske effektek: Amikor a robot felvesz vagy letesz egy csomagot, legyen egy kis "porfelhő" vagy digitális "glitch" effekt.

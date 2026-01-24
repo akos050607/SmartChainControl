@@ -1,34 +1,125 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.SignalR.Client
 @using SmartChainControl.Shared.Models
-@inject NavigationManager Navigation
 @inject IJSRuntime JS
 
-<PageTitle>SmartChainControl - 3D View</PageTitle>
+<PageTitle>SmartChainControl - Command Center</PageTitle>
 
 <canvas id="renderCanvas"></canvas>
 
+<div class="ui-layer">
+    
+    <div class="hud-panel top-bar">
+        <div style="font-size: 1.5rem; font-weight: bold; color: #fff; letter-spacing: 2px;">
+            <span style="color: #00ffff;">SMART</span>CHAINCONTROL <span style="font-size:0.6em; color:#666; vertical-align: middle;">OS v3.1</span>
+        </div>
+        
+        <div class="stats-container">
+            <div class="stat-item">
+                <div class="stat-value">@Robots.Count</div>
+                <div class="stat-label">Active Units</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" style="color: #ffaa00">@Robots.Count(r => r.HasCargo)</div>
+                <div class="stat-label">Tasks Active</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" style="color: #00ff00">ONLINE</div>
+                <div class="stat-label">Network</div>
+            </div>
+        </div>
+    </div>
+
+    @if (SelectedRobot != null)
+    {
+        <div class="hud-panel detail-panel">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                <h3 style="margin:0; color: @SelectedRobot.ColorHex; text-shadow: 0 0 10px @SelectedRobot.ColorHex;">
+                    UNIT-@SelectedRobot.Id.ToString("D2")
+                </h3>
+                <button @onclick="() => SelectedRobot = null" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">&times;</button>
+            </div>
+            
+            <div class="detail-row">
+                <span class="detail-key">STATUS</span>
+                <span class="detail-val">@SelectedRobot.State.ToUpper()</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-key">BATTERY</span>
+                <span class="detail-val" style="color: @GetBatteryColor(SelectedRobot.Id)">@GetBatteryLevel(SelectedRobot.Id)%</span>
+            </div>
+             <div class="detail-row">
+                <span class="detail-key">VELOCITY</span>
+                <span class="detail-val">1.8 m/s</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-key">PAYLOAD</span>
+                <span class="detail-val" style="color: @(SelectedRobot.HasCargo ? "#ffaa00" : "#666")">
+                    @(SelectedRobot.HasCargo ? "HEAVY CARGO" : "NO LOAD")
+                </span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-key">POSITION</span>
+                <span class="detail-val">X:@Math.Round(SelectedRobot.X,1) Y:@Math.Round(SelectedRobot.Y,1)</span>
+            </div>
+        </div>
+    }
+
+    <div class="hud-panel radar-container">
+        <div class="radar-grid"></div>
+        <div class="radar-sweep"></div>
+        
+        @foreach (var robot in Robots)
+        {
+            <div class="radar-dot"
+                 style="left: @((robot.X / 20.0 * 100))%; 
+                        top: @((robot.Y / 20.0 * 100))%;
+                        background-color: @robot.ColorHex;">
+            </div>
+        }
+    </div>
+</div>
+
 @code {
     private HubConnection? hubConnection;
+    public List<Robot> Robots { get; set; } = new();
+    public Robot? SelectedRobot { get; set; }
+    
+    private DotNetObjectReference<Home>? objRef;
 
     protected override async Task OnInitializedAsync()
     {
-        var serverUrl = "http://localhost:5206/warehousehub";
+        objRef = DotNetObjectReference.Create(this);
 
         hubConnection = new HubConnectionBuilder()
-        .WithUrl(serverUrl)
-        .AddMessagePackProtocol()
-        .WithAutomaticReconnect()
-        .Build();
+            .WithUrl("http://localhost:5206/warehousehub")
+            .AddMessagePackProtocol()
+            .WithAutomaticReconnect()
+            .Build();
 
-        hubConnection.On<List<Robot>>("ReceiveState", async (robots) =>
+        hubConnection.On<List<Robot>>("ReceiveState", (robots) =>
         {
-            await JS.InvokeVoidAsync("warehouseVisualizer.updateRobots", robots);
+            Robots = robots;
+            
+            if (SelectedRobot != null)
+            {
+                var fresh = Robots.FirstOrDefault(r => r.Id == SelectedRobot.Id);
+                if (fresh != null) SelectedRobot = fresh;
+            }
+            
+            StateHasChanged(); 
+            
+            if (Robots.Count > 0)
+            {
+                JS.InvokeVoidAsync("warehouseVisualizer.updateRobots", Robots);
+            }
         });
+
         hubConnection.On<MapInfo>("ReceiveMap", async (map) =>
         {
             await JS.InvokeVoidAsync("warehouseVisualizer.createMap", map);
         });
+
         await hubConnection.StartAsync();
     }
 
@@ -36,15 +127,23 @@
     {
         if (firstRender)
         {
-            await JS.InvokeVoidAsync("warehouseVisualizer.init", "renderCanvas");
+            await JS.InvokeVoidAsync("warehouseVisualizer.init", "renderCanvas", objRef);
         }
     }
 
+    [JSInvokable]
+    public void SelectRobotFromJS(int robotId)
+    {
+        SelectedRobot = Robots.FirstOrDefault(r => r.Id == robotId);
+        StateHasChanged();
+    }
+
+    private int GetBatteryLevel(int id) => 100 - ((DateTime.Now.Second + id * 7) % 30); 
+    private string GetBatteryColor(int id) => GetBatteryLevel(id) > 50 ? "#00ff00" : "#ff3300";
+
     public async ValueTask DisposeAsync()
     {
-        if (hubConnection is not null)
-        {
-            await hubConnection.DisposeAsync();
-        }
+        objRef?.Dispose();
+        if (hubConnection is not null) await hubConnection.DisposeAsync();
     }
 }
