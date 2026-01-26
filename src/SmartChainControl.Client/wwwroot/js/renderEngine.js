@@ -15,38 +15,30 @@ window.warehouseVisualizer = {
         this.highlightedShelves = [];
 
         this.canvas = document.getElementById(canvasId);
-        
-        this.engine = new BABYLON.Engine(this.canvas, true, { 
-            preserveDrawingBuffer: true, 
-            antialias: true 
-        });
-        
+        this.engine = new BABYLON.Engine(this.canvas, true, { preserveDrawingBuffer: true, antialias: true });
         this.scene = new BABYLON.Scene(this.engine);
         this.scene.clearColor = new BABYLON.Color3(0.02, 0.02, 0.04); 
 
-        var camera = new BABYLON.ArcRotateCamera("Camera", -Math.PI / 2, Math.PI / 3, 24, new BABYLON.Vector3(10, 0, 10), this.scene);
+        var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 3, 24, new BABYLON.Vector3(10, 0, 10), this.scene);
         camera.attachControl(this.canvas, true);
         camera.wheelPrecision = 50;
         camera.minZ = 0.5;
 
+        // Picking
         this.scene.onPointerDown = (evt, pickResult) => {
             if (pickResult.hit && pickResult.pickedMesh) {
                 var mesh = pickResult.pickedMesh;
                 var root = mesh;
                 while (root.parent) root = root.parent;
-
                 if (root.name && root.name.startsWith("root_")) {
                     var id = parseInt(root.name.split("_")[1]);
-                    if (this.dotNetHelper) {
-                        this.dotNetHelper.invokeMethodAsync("SelectRobotFromJS", id);
-                    }
+                    if (this.dotNetHelper) this.dotNetHelper.invokeMethodAsync("SelectRobotFromJS", id);
                 }
             }
         };
 
         var hemiLight = new BABYLON.HemisphericLight("hemiLight", new BABYLON.Vector3(0, 1, 0), this.scene);
         hemiLight.intensity = 0.4; 
-
         var dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-1, -2, -1), this.scene);
         dirLight.position = new BABYLON.Vector3(20, 40, 20);
         dirLight.intensity = 0.8;
@@ -56,9 +48,7 @@ window.warehouseVisualizer = {
         this.shadowGenerator.blurKernel = 16; 
 
         var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, this.scene);
-        ground.position.x = 10;
-        ground.position.z = 10;
-        ground.receiveShadows = true;
+        ground.position.x = 10; ground.position.z = 10; ground.receiveShadows = true;
 
         this.mirrorTexture = new BABYLON.MirrorTexture("mirror", 512, this.scene, true);
         this.mirrorTexture.mirrorPlane = new BABYLON.Plane(0, -1, 0, 0);
@@ -78,23 +68,32 @@ window.warehouseVisualizer = {
                 this.scene.render();
             }
         });
-
-        window.addEventListener("resize", () => {
-            this.engine.resize();
-        });
+        window.addEventListener("resize", () => { this.engine.resize(); });
     },
-    
+
     animateDrones: function() {
         var now = Date.now();
         for (var id in this.robotMeshes) {
             var robotObj = this.robotMeshes[id];
-            if (robotObj.propellers) robotObj.propellers.forEach(p => p.rotation.y += 0.8);
-            if (robotObj.metadata && robotObj.metadata.hasCargo) {
-                var intensity = Math.sin(now * 0.025) > 0.2 ? 8.0 : 0.2; 
-                if (robotObj.cargoMesh) robotObj.cargoMesh.rotation.y += 0.1;
-                robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(intensity);
-            } else {
-                if (robotObj.metadata) robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(1.5);
+            if (robotObj.metadata && robotObj.metadata.state !== "Charging") {
+                if (robotObj.propellers) robotObj.propellers.forEach(p => p.rotation.y += 0.8);
+            }
+
+            if (robotObj.metadata) {
+                var mat = robotObj.lightMat;
+                
+                if (robotObj.metadata.state === "Charging") {
+                    var pulse = 0.5 + (Math.sin(now * 0.005) * 0.5 + 0.5);
+                    mat.emissiveColor = new BABYLON.Color3(1, 1, 1).scale(pulse * 2.0);
+                } 
+                else if (robotObj.metadata.hasCargo) {
+                    var intensity = Math.sin(now * 0.025) > 0.2 ? 8.0 : 0.2; 
+                    if (robotObj.cargoMesh) robotObj.cargoMesh.rotation.y += 0.1;
+                    mat.emissiveColor = robotObj.metadata.baseColor.scale(intensity);
+                } 
+                else {
+                    mat.emissiveColor = robotObj.metadata.baseColor.scale(1.5);
+                }
             }
         }
     },
@@ -145,26 +144,52 @@ window.warehouseVisualizer = {
         var cargoMat = new BABYLON.StandardMaterial("cargoMat", this.scene); cargoMat.emissiveColor = new BABYLON.Color3(1, 1, 1); cargo.material = cargoMat; cargo.isVisible = false; 
         return { mesh: root, lightMat: lightMat, cargoMesh: cargo, propellers: propellers };
     },
+
     updateRobots: function (robotsData) {
         this.clearShelfHighlights();
+
         robotsData.forEach(robot => {
             var robotObj = this.robotMeshes[robot.id];
+
             if (!robotObj) {
                 robotObj = this.createDroneMesh(robot.id, robot.colorHex);
-                robotObj.mesh.getChildMeshes().forEach(m => { this.shadowGenerator.addShadowCaster(m); this.mirrorTexture.renderList.push(m); });
-                robotObj.metadata = { baseColor: BABYLON.Color3.FromHexString(robot.colorHex), hasCargo: false };
+                robotObj.mesh.getChildMeshes().forEach(m => {
+                    this.shadowGenerator.addShadowCaster(m);
+                    this.mirrorTexture.renderList.push(m);
+                });
+                robotObj.metadata = { 
+                    baseColor: BABYLON.Color3.FromHexString(robot.colorHex),
+                    hasCargo: false,
+                    state: "Idle"
+                };
                 this.robotMeshes[robot.id] = robotObj;
             }
+
             var root = robotObj.mesh;
+            
             robotObj.metadata.hasCargo = robot.hasCargo;
-            var hoverHeight = 1.8 + Math.sin(Date.now() * 0.003 + robot.id) * 0.1;
+            robotObj.metadata.state = robot.state;
+
+            var targetY;
+            if (robot.state === "Charging") {
+                targetY = 0.2;
+            } else {
+                targetY = 1.8 + Math.sin(Date.now() * 0.003 + robot.id) * 0.1;
+            }
             root.position.x = BABYLON.Scalar.Lerp(root.position.x, robot.x, 0.2);
             root.position.z = BABYLON.Scalar.Lerp(root.position.z, robot.y, 0.2);
-            root.position.y = BABYLON.Scalar.Lerp(root.position.y, hoverHeight, 0.4);
-            if (robotObj.cargoMesh) robotObj.cargoMesh.isVisible = robot.hasCargo;
-            if (robot.currentTargetNode) this.highlightShelf(robot.currentTargetNode.x, robot.currentTargetNode.y, robot.colorHex);
+            root.position.y = BABYLON.Scalar.Lerp(root.position.y, targetY, 0.1);
+
+            if (robotObj.cargoMesh) {
+                robotObj.cargoMesh.isVisible = robot.hasCargo;
+            }
+
+            if (robot.currentTargetNode) {
+                this.highlightShelf(robot.currentTargetNode.x, robot.currentTargetNode.y, robot.colorHex);
+            }
         });
     },
+
     highlightShelf: function(x, y, colorHex) {
         var shelfId = "obs_" + x + "_" + y;
         var shelfMesh = this.scene.getMeshByName(shelfId);
