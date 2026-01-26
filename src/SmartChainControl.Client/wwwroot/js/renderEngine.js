@@ -70,33 +70,33 @@ window.warehouseVisualizer = {
         });
         window.addEventListener("resize", () => { this.engine.resize(); });
     },
-
+    
     animateDrones: function() {
         var now = Date.now();
         for (var id in this.robotMeshes) {
             var robotObj = this.robotMeshes[id];
+            
             if (robotObj.metadata && robotObj.metadata.state !== "Charging") {
                 if (robotObj.propellers) robotObj.propellers.forEach(p => p.rotation.y += 0.8);
             }
 
             if (robotObj.metadata) {
-                var mat = robotObj.lightMat;
-                
                 if (robotObj.metadata.state === "Charging") {
-                    var pulse = 0.5 + (Math.sin(now * 0.005) * 0.5 + 0.5);
-                    mat.emissiveColor = new BABYLON.Color3(1, 1, 1).scale(pulse * 2.0);
-                } 
+                    var pulse = 0.5 + (Math.sin(now * 0.005) * 0.5 + 0.5); 
+                    robotObj.lightMat.emissiveColor = new BABYLON.Color3(1, 1, 1).scale(pulse * 2.0);
+                }
                 else if (robotObj.metadata.hasCargo) {
                     var intensity = Math.sin(now * 0.025) > 0.2 ? 8.0 : 0.2; 
                     if (robotObj.cargoMesh) robotObj.cargoMesh.rotation.y += 0.1;
-                    mat.emissiveColor = robotObj.metadata.baseColor.scale(intensity);
+                    robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(intensity);
                 } 
                 else {
-                    mat.emissiveColor = robotObj.metadata.baseColor.scale(1.5);
+                    robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(1.5);
                 }
             }
         }
     },
+
     createDropOffZones: function() {
         for (let i = 0; i < 5; i++) {
             let colorHex = this.zoneColors[i % this.zoneColors.length];
@@ -168,7 +168,7 @@ window.warehouseVisualizer = {
             var root = robotObj.mesh;
             
             robotObj.metadata.hasCargo = robot.hasCargo;
-            robotObj.metadata.state = robot.state;
+            robotObj.metadata.state = robot.state; 
 
             var targetY;
             if (robot.state === "Charging") {
@@ -176,9 +176,10 @@ window.warehouseVisualizer = {
             } else {
                 targetY = 1.8 + Math.sin(Date.now() * 0.003 + robot.id) * 0.1;
             }
+
             root.position.x = BABYLON.Scalar.Lerp(root.position.x, robot.x, 0.2);
             root.position.z = BABYLON.Scalar.Lerp(root.position.z, robot.y, 0.2);
-            root.position.y = BABYLON.Scalar.Lerp(root.position.y, targetY, 0.1);
+            root.position.y = BABYLON.Scalar.Lerp(root.position.y, targetY, 0.1); 
 
             if (robotObj.cargoMesh) {
                 robotObj.cargoMesh.isVisible = robot.hasCargo;
