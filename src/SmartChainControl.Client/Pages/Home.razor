@@ -10,9 +10,10 @@
 <div class="ui-layer">
     <div class="hud-panel top-bar">
         <div style="font-size: 1.5rem; font-weight: bold; color: #fff; letter-spacing: 2px;">
-            <span style="color: #00ffff;">SMART</span>WAREHOUSE <span style="font-size:0.6em; color:#666; vertical-align: middle;">OS v3.4</span>
+            <span style="color: #00ffff;">SMART</span>WAREHOUSE <span
+                style="font-size:0.6em; color:#666; vertical-align: middle;">OS v3.4</span>
         </div>
-        
+
         <div class="stats-container">
             <div class="stat-item">
                 <div class="stat-value">@Robots.Count</div>
@@ -36,18 +37,20 @@
                 <h3 style="margin:0; color: @SelectedRobot.ColorHex; text-shadow: 0 0 10px @SelectedRobot.ColorHex;">
                     UNIT-@SelectedRobot.Id.ToString("D2")
                 </h3>
-                <button @onclick="() => SelectedRobot = null" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">&times;</button>
+                <button @onclick="() => SelectedRobot = null"
+                    style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">&times;</button>
             </div>
-            
-            <div class="detail-row"><span class="detail-key">STATUS</span><span class="detail-val">@SelectedRobot.State.ToUpper()</span></div>
-            
+
+            <div class="detail-row"><span class="detail-key">STATUS</span><span
+                    class="detail-val">@SelectedRobot.State.ToUpper()</span></div>
+
             <div class="detail-row">
                 <span class="detail-key">BATTERY</span>
                 <span class="detail-val" style="color: @GetBatteryColor(SelectedRobot.BatteryLevel)">
-                    @Math.Round(SelectedRobot.BatteryLevel, 1)%
+                    @SelectedRobot.BatteryLevel.ToString("F1")%
                 </span>
             </div>
-            
+
             <div class="detail-row"><span class="detail-key">VELOCITY</span><span class="detail-val">1.8 m/s</span></div>
             <div class="detail-row">
                 <span class="detail-key">PAYLOAD</span>
@@ -55,7 +58,8 @@
                     @(SelectedRobot.HasCargo ? "HEAVY CARGO" : "NO LOAD")
                 </span>
             </div>
-            <div class="detail-row"><span class="detail-key">POSITION</span><span class="detail-val">X:@Math.Round(SelectedRobot.X,1) Y:@Math.Round(SelectedRobot.Y,1)</span></div>
+            <div class="detail-row"><span class="detail-key">POSITION</span><span
+                    class="detail-val">X:@SelectedRobot.X.ToString("F1") Y:@SelectedRobot.Y.ToString("F1")</span></div>
         </div>
     }
 
@@ -65,11 +69,10 @@
         {
             @foreach (var obs in CurrentMap.Obstacles)
             {
-                <div class="map-shelf"
-                     style="left: @((obs.X / 20.0 * 100))%; 
-                            bottom: @((obs.Y / 20.0 * 100))%;
-                            width: 5%; height: 5%;
-                            background-color: @GetShelfColor(obs.X, obs.Y);">
+                <div class="map-shelf" style="left: @((obs.X / 20.0 * 100))%; 
+                                    bottom: @((obs.Y / 20.0 * 100))%;
+                                    width: 5%; height: 5%;
+                                    background-color: @GetShelfColor(obs.X, obs.Y);">
                 </div>
             }
         }
@@ -78,17 +81,15 @@
             string[] colors = new[] { "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF" };
             string color = colors[i % colors.Length];
             int yPos = 2 + (i * 3);
-            <div class="map-zone"
-                 style="left: 0%; bottom: @((yPos / 20.0 * 100))%;
-                        width: 6%; height: 6%;
-                        border-color: @color; color: @color;">Z@(i+1)</div>
+            <div class="map-zone" style="left: 0%; bottom: @((yPos / 20.0 * 100))%;
+                            width: 6%; height: 6%;
+                            border-color: @color; color: @color;">Z@(i + 1)</div>
         }
         @foreach (var robot in Robots)
         {
-            <div class="radar-dot"
-                 style="left: @((robot.X / 20.0 * 100))%; 
-                        bottom: @((robot.Y / 20.0 * 100))%;
-                        background-color: @robot.ColorHex;"></div>
+            <div class="radar-dot" style="left: @((robot.X / 20.0 * 100))%; 
+                            bottom: @((robot.Y / 20.0 * 100))%;
+                            background-color: @robot.ColorHex;"></div>
         }
     </div>
 </div>
@@ -96,7 +97,7 @@
 @code {
     private HubConnection? hubConnection;
     public List<Robot> Robots { get; set; } = new();
-    public MapInfo? CurrentMap { get; set; } 
+    public MapInfo? CurrentMap { get; set; }
     public Robot? SelectedRobot { get; set; }
     private DotNetObjectReference<Home>? objRef;
 
@@ -104,10 +105,10 @@
     {
         objRef = DotNetObjectReference.Create(this);
         hubConnection = new HubConnectionBuilder()
-            .WithUrl("http://localhost:5206/warehousehub")
-            .AddMessagePackProtocol()
-            .WithAutomaticReconnect()
-            .Build();
+        .WithUrl("http://localhost:5206/warehousehub")
+        .AddMessagePackProtocol()
+        .WithAutomaticReconnect()
+        .Build();
 
         hubConnection.On<List<Robot>>("ReceiveState", (robots) =>
         {
@@ -124,7 +125,7 @@
         hubConnection.On<MapInfo>("ReceiveMap", async (map) =>
         {
             CurrentMap = map;
-            StateHasChanged(); 
+            StateHasChanged();
             await JS.InvokeVoidAsync("warehouseVisualizer.createMap", map);
         });
         await hubConnection.StartAsync();
@@ -144,7 +145,8 @@
 
     private string GetShelfColor(int x, int y)
     {
-        var targetingRobot = Robots.FirstOrDefault(r => r.CurrentTargetNode != null && (int)r.CurrentTargetNode.X == x && (int)r.CurrentTargetNode.Y == y);
+        var targetingRobot = Robots.FirstOrDefault(r => r.CurrentTargetNode != null && (int)r.CurrentTargetNode.X == x &&
+        (int)r.CurrentTargetNode.Y == y);
         return targetingRobot != null ? targetingRobot.ColorHex : "rgba(100, 110, 130, 0.6)";
     }
 
