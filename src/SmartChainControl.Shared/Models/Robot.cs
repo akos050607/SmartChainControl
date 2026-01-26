@@ -25,5 +25,7 @@ namespace SmartChainControl.Shared.Models
         public int StuckTicks { get; set; } = 0;
 
         public int PatienceThreshold { get; set; } = 10;
+
+        public double BatteryLevel { get; set; } = 100.0;
     }
 }
