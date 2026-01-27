@@ -10,20 +10,6 @@
 
 ---
 
-## 📸 Visuals
-
-<p align="center">
-  <img src="docs/image_2541ad.png" alt="3D Overview" width="45%">
-  <img src="docs/image_bd4eee.png" alt="Drone Fleet" width="45%">
-</p>
-<p align="center">
-  <img src="docs/image_6a5940.png" alt="Charging Station" width="80%">
-</p>
-
-> *Real-time 3D visualization featuring procedural drones, dynamic lighting, and a tactical HUD.*
-
----
-
 ## 🚀 Key Features
 
 ### 🧠 Intelligent Backend (Server)
@@ -68,3 +54,4 @@
 ---
 
 *2026 - SmartChainControl Project*
+
