@@ -123,14 +123,6 @@ SmartChainControl/
 ├── README.md                    # A projekt leírása (nagyon fontos!)
 └── SmartChainControl.sln        # Visual Studio Solution fájl
 
-2. UI / UX (A "Control Room" érzés)
-A jelenlegi fehér fejléc és a lila Blazor menü "megöli" a hangulatot. Integráld a UI-t a 3D térbe.
-
-Glassmorphism / HUD stílus: Felejtsd el a bal oldali standard menüt. Lebegő paneleket használj (félig átlátszó, sötét háttérrel, elmosódással), mintha egy űrhajó vagy egy biztonsági központ irányítópultja lenne.
-
-Adatvizualizáció: Ha rákattintasz egy robotra, ugorjon fel egy kis ablak a feje fölött (vagy oldalt) a státuszával: Battery Level, Current Task, Speed, LoadID.
-
-Minimap: A képernyő sarkába tegyél egy 2D-s felülnézeti térképet (radar), ami mutatja a pontokat.
 
 3. Animáció és Mozgás (A "Flow")
 A mozgás legyen organikus, ne csak koordináta-ugrás.

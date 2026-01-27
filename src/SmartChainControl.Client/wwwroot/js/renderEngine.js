@@ -1,3 +1,4 @@
+// Babylon.js 3D warehouse visualization engine
 window.warehouseVisualizer = {
     canvas: null,
     engine: null,
@@ -9,6 +10,7 @@ window.warehouseVisualizer = {
     
     zoneColors: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF"],
 
+    // Initialize 3D scene with camera, lights, and ground plane
     init: function (canvasId, dotNetHelper) {
         this.dotNetHelper = dotNetHelper;
         this.robotMeshes = {}; 
@@ -24,7 +26,7 @@ window.warehouseVisualizer = {
         camera.wheelPrecision = 50;
         camera.minZ = 0.5;
 
-        // Picking
+        // Handle mouse clicks on 3D meshes to select robots
         this.scene.onPointerDown = (evt, pickResult) => {
             if (pickResult.hit && pickResult.pickedMesh) {
                 var mesh = pickResult.pickedMesh;
@@ -50,6 +52,7 @@ window.warehouseVisualizer = {
         var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, this.scene);
         ground.position.x = 10; ground.position.z = 10; ground.receiveShadows = true;
 
+        // Create reflective ground material with mirror texture
         this.mirrorTexture = new BABYLON.MirrorTexture("mirror", 512, this.scene, true);
         this.mirrorTexture.mirrorPlane = new BABYLON.Plane(0, -1, 0, 0);
         this.mirrorTexture.level = 0.35; 
@@ -71,11 +74,13 @@ window.warehouseVisualizer = {
         window.addEventListener("resize", () => { this.engine.resize(); });
     },
     
+    // Animate drone propellers and hover effect
     animateDrones: function() {
         var now = Date.now();
         for (var id in this.robotMeshes) {
             var robotObj = this.robotMeshes[id];
             
+            // Spin propellers when not charging
             if (robotObj.metadata && robotObj.metadata.state !== "Charging") {
                 if (robotObj.propellers) robotObj.propellers.forEach(p => p.rotation.y += 0.8);
             }
@@ -97,6 +102,7 @@ window.warehouseVisualizer = {
         }
     },
 
+    // Create colored drop-off zones with glowing borders
     createDropOffZones: function() {
         for (let i = 0; i < 5; i++) {
             let colorHex = this.zoneColors[i % this.zoneColors.length];
@@ -123,6 +129,7 @@ window.warehouseVisualizer = {
             this.shadowGenerator.addShadowCaster(shelf); this.mirrorTexture.renderList.push(shelf);
         });
     },
+    // Build complete drone mesh with propellers, arms, and cargo bay
     createDroneMesh: function(id, colorHex) {
         var color = BABYLON.Color3.FromHexString(colorHex);
         var root = new BABYLON.TransformNode("root_" + id, this.scene);
@@ -145,6 +152,7 @@ window.warehouseVisualizer = {
         return { mesh: root, lightMat: lightMat, cargoMesh: cargo, propellers: propellers };
     },
 
+    // Update all robot positions and states from server data
     updateRobots: function (robotsData) {
         this.clearShelfHighlights();
 

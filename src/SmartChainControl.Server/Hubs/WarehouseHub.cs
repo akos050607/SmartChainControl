@@ -4,6 +4,9 @@ using SmartChainControl.Shared.Models;
 
 namespace SmartChainControl.Server.Hubs;
 
+/// <summary>
+/// SignalR hub for real-time warehouse simulation updates
+/// </summary>
 public class WarehouseHub : Hub
 {
     private readonly SimulationManager _simulationManager;
@@ -13,6 +16,7 @@ public class WarehouseHub : Hub
         _simulationManager = simulationManager;
     }
 
+    // Send initial map and robot state when client connects
     public override async Task OnConnectedAsync()
     {
         await Clients.Caller.SendAsync("ReceiveMap", _simulationManager.Map);

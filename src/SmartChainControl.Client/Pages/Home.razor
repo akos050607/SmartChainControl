@@ -95,6 +95,7 @@
 </div>
 
 @code {
+    // SignalR connection for real-time updates from server  
     private HubConnection? hubConnection;
     public List<Robot> Robots { get; set; } = new();
     public MapInfo? CurrentMap { get; set; }
@@ -104,6 +105,7 @@
     protected override async Task OnInitializedAsync()
     {
         objRef = DotNetObjectReference.Create(this);
+        // Establish SignalR connection with MessagePack protocol
         hubConnection = new HubConnectionBuilder()
         .WithUrl("http://localhost:5206/warehousehub")
         .AddMessagePackProtocol()
@@ -133,9 +135,11 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // Initialize Babylon.js renderer on first render only
         if (firstRender) await JS.InvokeVoidAsync("warehouseVisualizer.init", "renderCanvas", objRef);
     }
 
+    // Called from JavaScript when user clicks on a robot mesh
     [JSInvokable]
     public void SelectRobotFromJS(int robotId)
     {

@@ -31,6 +31,7 @@ public class SimulationManager
         Map = GenerateWarehouseMap();
         _pathfinder = new Pathfinder(Map);
 
+        // Initialize 5 robots with unique colors, home positions and battery drain rates
         for (int i = 0; i < 5; i++)
         {
             int startY = 2 + (i * 3);
@@ -58,6 +59,7 @@ public class SimulationManager
         }
     }
 
+    // Generate warehouse layout with shelf grid pattern
     private MapInfo GenerateWarehouseMap()
     {
         var map = new MapInfo { Width = MapWidth, Height = MapHeight };
@@ -74,6 +76,7 @@ public class SimulationManager
 
     public void Update()
     {
+        // Track occupied cells to prevent robot collisions
         var occupiedCells = new HashSet<(int, int)>();
         foreach (var r in Robots)
         {
@@ -84,11 +87,13 @@ public class SimulationManager
         {
             var internalState = _internalStates[robot.Id];
 
+            // Continuously drain battery when not charging
             if (robot.State != "Charging")
             {
                 robot.BatteryLevel -= internalState.DrainRate;
                 if (robot.BatteryLevel < 0) robot.BatteryLevel = 0;
 
+                // Force return to charging station when battery is low
                 if (robot.BatteryLevel < 30 && robot.State != "Returning" && robot.State != "Charging")
                 {
                     robot.HasCargo = false;
@@ -198,6 +203,7 @@ public class SimulationManager
         if (isBlocked)
         {
             robot.StuckTicks++;
+            // Recalculate path after waiting, treating other robots as obstacles
             if (robot.StuckTicks > robot.PatienceThreshold)
             {
                 var otherRobotsAsObstacles = new HashSet<(int, int)>(occupiedCells);
