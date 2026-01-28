@@ -23,4 +23,14 @@ public class WarehouseHub : Hub
         await Clients.Caller.SendAsync("ReceiveState", _simulationManager.Robots);
         await base.OnConnectedAsync();
     }
+    public Task ToggleManualMode(int robotId, bool enable)
+    {
+        _simulationManager.ToggleManualMode(robotId, enable);
+        return Task.CompletedTask;
+    }
+
+    public async Task ManualMoveCommand(int robotId, int targetX, int targetY)
+    {
+        _simulationManager.SetManualTarget(robotId, targetX, targetY);
+    }
 }

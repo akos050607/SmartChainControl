@@ -17,6 +17,7 @@ public class SimulationManager
         public int ChargingTimer { get; set; } = 0;
         public (int X, int Y) HomePosition { get; set; }
         public double DrainRate { get; set; }
+        public bool IsManual { get; set; } = false;
     }
     private Dictionary<int, RobotInternalState> _internalStates = new();
 
@@ -39,7 +40,7 @@ public class SimulationManager
             double randomDrain = 0.01 + (_random.NextDouble() * 0.02);
 
             _internalStates.Add(i + 1, new RobotInternalState
-            { 
+            {
                 HomePosition = (0, startY),
                 DrainRate = randomDrain
             });
@@ -73,12 +74,83 @@ public class SimulationManager
         }
         return map;
     }
+    private void RecalculatePath(Robot robot)
+    {
+        var path = _pathfinder.FindPath(
+            (int)Math.Round(robot.X), 
+            (int)Math.Round(robot.Y), 
+            (int)robot.TargetX, 
+            (int)robot.TargetY
+        );
+        robot.CurrentPath = path ?? new List<Position>();
+    }
 
+    public void ToggleManualMode(int robotId, bool enable)
+    {
+        var robot = Robots.FirstOrDefault(r => r.Id == robotId);
+        if (robot == null) return;
+        var state = _internalStates[robotId];
+
+        if (enable)
+        {
+            state.IsManual = true;
+            robot.State = "Manual";
+            robot.CurrentPath = new List<Position>();
+        }
+        else
+        {
+            state.IsManual = false;
+
+            if (robot.HasCargo)
+            {
+                robot.State = "ToExit";
+                robot.TargetX = state.HomePosition.X;
+                robot.TargetY = state.HomePosition.Y;
+                RecalculatePath(robot);
+            }
+            else if (robot.CurrentTargetNode != null)
+            {
+                var shelfX = (int)robot.CurrentTargetNode.X;
+                var shelfY = (int)robot.CurrentTargetNode.Y;
+                var entryPoint = GetWalkableNeighbor(shelfX, shelfY);
+
+                if (entryPoint != null)
+                {
+                    robot.State = "ToShelf";
+                    robot.TargetX = entryPoint.X;
+                    robot.TargetY = entryPoint.Y;
+                    RecalculatePath(robot);
+                }
+                else
+                {
+                    robot.State = "Idle";
+                    robot.CurrentTargetNode = null;
+                }
+            }
+            else
+            {
+                robot.State = "Idle";
+            }
+        }
+    }
+
+    public void SetManualTarget(int robotId, int x, int y)
+    {
+        var robot = Robots.FirstOrDefault(r => r.Id == robotId);
+        if (robot == null) return;
+        var state = _internalStates[robotId];
+
+        state.IsManual = true;
+        robot.State = "Manual";
+        robot.TargetX = x;
+        robot.TargetY = y;
+        var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), x, y);
+        robot.CurrentPath = path ?? new List<Position>();
+    }
     public void Update()
     {
-        // Track occupied cells to prevent robot collisions
         var occupiedCells = new HashSet<(int, int)>();
-        foreach (var r in Robots)
+        foreach (var r in Robots) 
         {
             occupiedCells.Add(((int)Math.Round(r.X), (int)Math.Round(r.Y)));
         }
@@ -87,98 +159,119 @@ public class SimulationManager
         {
             var internalState = _internalStates[robot.Id];
 
-            // Continuously drain battery when not charging
+            if (internalState.IsManual)
+            {
+                robot.BatteryLevel -= internalState.DrainRate;
+                if (robot.BatteryLevel < 0) robot.BatteryLevel = 0;
+                MoveRobot(robot, occupiedCells);
+                continue; 
+            }
+
             if (robot.State != "Charging")
             {
                 robot.BatteryLevel -= internalState.DrainRate;
                 if (robot.BatteryLevel < 0) robot.BatteryLevel = 0;
 
-                // Force return to charging station when battery is low
-                if (robot.BatteryLevel < 30 && robot.State != "Returning" && robot.State != "Charging")
+                if (robot.BatteryLevel < 30 && robot.State != "Returning" && robot.State != "ToExit" && robot.State != "Manual")
                 {
-                    robot.HasCargo = false;
+                    robot.HasCargo = false; 
                     robot.State = "Returning";
                     robot.CurrentTargetNode = null;
-
                     robot.TargetX = internalState.HomePosition.X;
                     robot.TargetY = internalState.HomePosition.Y;
-                    robot.StuckTicks = 0;
-
-                    var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
-                    robot.CurrentPath = path ?? new List<Position>();
+                    RecalculatePath(robot);
                 }
             }
+
             if (robot.State == "Charging")
             {
                 internalState.ChargingTimer++;
-
                 robot.BatteryLevel = Math.Min(100, 30 + ((double)internalState.ChargingTimer / 1200.0 * 70));
 
-                if (internalState.ChargingTimer >= 1200)
+                if (internalState.ChargingTimer >= 1200) 
                 {
                     robot.BatteryLevel = 100;
                     robot.State = "Idle";
                     internalState.ChargingTimer = 0;
                 }
-                continue;
+                continue; 
             }
+            
             else if (robot.State == "Returning" && IsPathFinished(robot))
             {
-                robot.State = "Charging";
-                internalState.ChargingTimer = 0;
-            }
-            else if (robot.State == "Idle")
-            {
-                if (robot.BatteryLevel > 30)
+                if (IsAtPosition(robot, internalState.HomePosition.X, internalState.HomePosition.Y))
                 {
-                    var shelf = GetFreeRandomShelf(robot.Id);
-
-                    if (shelf != null)
+                    robot.State = "Charging";
+                    internalState.ChargingTimer = 0;
+                }
+                else
+                {
+                    RecalculatePath(robot);
+                }
+            }
+            
+            else if (robot.State == "Idle" && robot.BatteryLevel > 30)
+            {
+                var shelf = GetFreeRandomShelf(robot.Id);
+                if (shelf != null)
+                {
+                    var entryPoint = GetWalkableNeighbor(shelf.X, shelf.Y);
+                    if (entryPoint != null)
                     {
-                        var entryPoint = GetWalkableNeighbor(shelf.X, shelf.Y);
-                        if (entryPoint != null)
-                        {
-                            robot.CurrentTargetNode = new Position { X = shelf.X, Y = shelf.Y };
-                            robot.TargetX = entryPoint.X;
-                            robot.TargetY = entryPoint.Y;
-                            robot.StuckTicks = 0;
-                            robot.PatienceThreshold = _random.Next(5, 20);
-
-                            var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
-
-                            if (path != null && path.Count > 0)
-                            {
-                                robot.CurrentPath = path;
-                                robot.State = "ToShelf";
-                            }
-                        }
+                        robot.CurrentTargetNode = new Position { X = shelf.X, Y = shelf.Y };
+                        robot.TargetX = entryPoint.X;
+                        robot.TargetY = entryPoint.Y;
+                        robot.StuckTicks = 0;
+                        robot.PatienceThreshold = _random.Next(5, 20); 
+                        
+                        robot.State = "ToShelf";
+                        RecalculatePath(robot);
                     }
                 }
             }
+            
             else if (robot.State == "ToShelf" && IsPathFinished(robot))
             {
-                robot.State = "Loading";
-                robot.HasCargo = true;
+                if (robot.CurrentTargetNode != null && 
+                    IsAtPosition(robot, robot.TargetX, robot.TargetY))
+                {
+                    robot.State = "Loading";
+                    robot.HasCargo = true;
+                    
+                    robot.TargetX = internalState.HomePosition.X;
+                    robot.TargetY = internalState.HomePosition.Y;
+                    robot.StuckTicks = 0;
 
-                var myZone = _dropOffZones[robot.Id];
-                robot.TargetX = myZone.X;
-                robot.TargetY = myZone.Y;
-
-                robot.CurrentTargetNode = null;
-                robot.StuckTicks = 0;
-
-                var path = _pathfinder.FindPath((int)Math.Round(robot.X), (int)Math.Round(robot.Y), (int)robot.TargetX, (int)robot.TargetY);
-                robot.CurrentPath = path ?? new List<Position>();
-                robot.State = "ToExit";
+                    robot.State = "ToExit";
+                    RecalculatePath(robot);
+                }
+                else
+                {
+                    robot.State = "Idle";
+                    robot.CurrentTargetNode = null;
+                }
             }
+            
             else if (robot.State == "ToExit" && IsPathFinished(robot))
             {
-                robot.HasCargo = false;
-                robot.State = "Idle";
+                if (IsAtPosition(robot, internalState.HomePosition.X, internalState.HomePosition.Y))
+                {
+                    robot.HasCargo = false;
+                    robot.State = "Idle"; 
+                }
+                else
+                {
+                    RecalculatePath(robot);
+                }
             }
 
             MoveRobot(robot, occupiedCells);
         }
+    }
+
+    private bool IsAtPosition(Robot robot, float targetX, float targetY)
+    {
+        return Math.Abs(robot.X - targetX) < 1.0f && Math.Abs(robot.Y - targetY) < 1.0f;
     }
 
     private void MoveRobot(Robot robot, HashSet<(int, int)> occupiedCells)
@@ -224,7 +317,7 @@ public class SimulationManager
         else
         {
             robot.StuckTicks = 0;
-            float speed = 0.05f;
+            float speed = 0.13f;
             float dx = target.X - robot.X;
             float dy = target.Y - robot.Y;
 

@@ -1,19 +1,21 @@
-// Babylon.js 3D warehouse visualization engine
 window.warehouseVisualizer = {
     canvas: null,
     engine: null,
     scene: null,
     robotMeshes: {}, 
+    pathLines: {},     // Útvonal vonalak tárolása
+    targetMarkers: {}, // Célkeresztek tárolása
     shadowGenerator: null,
     mirrorTexture: null, 
     dotNetHelper: null, 
     
     zoneColors: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF"],
 
-    // Initialize 3D scene with camera, lights, and ground plane
     init: function (canvasId, dotNetHelper) {
         this.dotNetHelper = dotNetHelper;
         this.robotMeshes = {}; 
+        this.pathLines = {};
+        this.targetMarkers = {};
         this.highlightedShelves = [];
 
         this.canvas = document.getElementById(canvasId);
@@ -26,15 +28,27 @@ window.warehouseVisualizer = {
         camera.wheelPrecision = 50;
         camera.minZ = 0.5;
 
-        // Handle mouse clicks on 3D meshes to select robots
+        // --- KATTINTÁS KEZELÉS ---
         this.scene.onPointerDown = (evt, pickResult) => {
             if (pickResult.hit && pickResult.pickedMesh) {
                 var mesh = pickResult.pickedMesh;
+                
+                // 1. Robotra kattintás
                 var root = mesh;
                 while (root.parent) root = root.parent;
                 if (root.name && root.name.startsWith("root_")) {
                     var id = parseInt(root.name.split("_")[1]);
                     if (this.dotNetHelper) this.dotNetHelper.invokeMethodAsync("SelectRobotFromJS", id);
+                    return; 
+                }
+
+                // 2. Padlóra kattintás (ha ground a neve)
+                if (mesh.name === "ground") {
+                    var x = Math.round(pickResult.pickedPoint.x);
+                    var y = Math.round(pickResult.pickedPoint.z); // Z a mélység Babylonban!
+                    if (this.dotNetHelper) {
+                        this.dotNetHelper.invokeMethodAsync("FloorClickFromJS", x, y);
+                    }
                 }
             }
         };
@@ -52,7 +66,6 @@ window.warehouseVisualizer = {
         var ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, this.scene);
         ground.position.x = 10; ground.position.z = 10; ground.receiveShadows = true;
 
-        // Create reflective ground material with mirror texture
         this.mirrorTexture = new BABYLON.MirrorTexture("mirror", 512, this.scene, true);
         this.mirrorTexture.mirrorPlane = new BABYLON.Plane(0, -1, 0, 0);
         this.mirrorTexture.level = 0.35; 
@@ -73,36 +86,130 @@ window.warehouseVisualizer = {
         });
         window.addEventListener("resize", () => { this.engine.resize(); });
     },
-    
-    // Animate drone propellers and hover effect
+
     animateDrones: function() {
         var now = Date.now();
         for (var id in this.robotMeshes) {
             var robotObj = this.robotMeshes[id];
             
-            // Spin propellers when not charging
+            // Marker forgatása
+            if (this.targetMarkers[id]) {
+                this.targetMarkers[id].rotation.y += 0.02;
+            }
+
             if (robotObj.metadata && robotObj.metadata.state !== "Charging") {
                 if (robotObj.propellers) robotObj.propellers.forEach(p => p.rotation.y += 0.8);
             }
 
             if (robotObj.metadata) {
+                var mat = robotObj.lightMat;
                 if (robotObj.metadata.state === "Charging") {
                     var pulse = 0.5 + (Math.sin(now * 0.005) * 0.5 + 0.5); 
-                    robotObj.lightMat.emissiveColor = new BABYLON.Color3(1, 1, 1).scale(pulse * 2.0);
+                    mat.emissiveColor = new BABYLON.Color3(1, 1, 1).scale(pulse * 2.0);
                 }
                 else if (robotObj.metadata.hasCargo) {
                     var intensity = Math.sin(now * 0.025) > 0.2 ? 8.0 : 0.2; 
                     if (robotObj.cargoMesh) robotObj.cargoMesh.rotation.y += 0.1;
-                    robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(intensity);
+                    mat.emissiveColor = robotObj.metadata.baseColor.scale(intensity);
                 } 
                 else {
-                    robotObj.lightMat.emissiveColor = robotObj.metadata.baseColor.scale(1.5);
+                    mat.emissiveColor = robotObj.metadata.baseColor.scale(1.5);
                 }
             }
         }
     },
 
-    // Create colored drop-off zones with glowing borders
+    // ÚJ: Vizuális elemek frissítése (Vonal + Marker)
+    updatePathVisuals: function(robot) {
+        var id = robot.id;
+        var color = BABYLON.Color3.FromHexString(robot.colorHex);
+
+        // 1. CÉLKERESZT (Marker)
+        // Csak akkor rajzoljuk, ha van célja és nem Idle/Charging
+        if (robot.state !== "Idle" && robot.state !== "Charging") {
+            if (!this.targetMarkers[id]) {
+                var marker = BABYLON.MeshBuilder.CreateTorus("target_" + id, { diameter: 0.8, thickness: 0.1 }, this.scene);
+                var mat = new BABYLON.StandardMaterial("targetMat_" + id, this.scene);
+                mat.emissiveColor = color;
+                mat.disableLighting = true;
+                marker.material = mat;
+                this.targetMarkers[id] = marker;
+            }
+            var m = this.targetMarkers[id];
+            m.position.x = robot.targetX;
+            m.position.z = robot.targetY;
+            m.position.y = 0.05;
+            m.isVisible = true;
+        } else {
+            if (this.targetMarkers[id]) this.targetMarkers[id].isVisible = false;
+        }
+
+        // 2. ÚTVONAL (Vonal)
+        if (robot.currentPath && robot.currentPath.length > 0) {
+            var points = [];
+            points.push(new BABYLON.Vector3(robot.x, 0.2, robot.y)); // Start
+            for (var i = 0; i < robot.currentPath.length; i++) {
+                var p = robot.currentPath[i];
+                points.push(new BABYLON.Vector3(p.x, 0.2, p.y));
+            }
+
+            if (this.pathLines[id]) {
+                this.pathLines[id] = BABYLON.MeshBuilder.CreateDashedLines(null, { points: points, instance: this.pathLines[id] });
+            } else {
+                var lines = BABYLON.MeshBuilder.CreateDashedLines("path_" + id, { points: points, dashSize: 3, gapSize: 1 }, this.scene);
+                lines.color = color;
+                this.pathLines[id] = lines;
+            }
+            this.pathLines[id].isVisible = true;
+        } else {
+            if (this.pathLines[id]) this.pathLines[id].isVisible = false;
+        }
+    },
+
+    updateRobots: function (robotsData) {
+        this.clearShelfHighlights();
+
+        robotsData.forEach(robot => {
+            var robotObj = this.robotMeshes[robot.id];
+
+            if (!robotObj) {
+                robotObj = this.createDroneMesh(robot.id, robot.colorHex);
+                robotObj.mesh.getChildMeshes().forEach(m => {
+                    this.shadowGenerator.addShadowCaster(m);
+                    this.mirrorTexture.renderList.push(m);
+                });
+                robotObj.metadata = { 
+                    baseColor: BABYLON.Color3.FromHexString(robot.colorHex),
+                    hasCargo: false,
+                    state: "Idle"
+                };
+                this.robotMeshes[robot.id] = robotObj;
+            }
+
+            var root = robotObj.mesh;
+            robotObj.metadata.hasCargo = robot.hasCargo;
+            robotObj.metadata.state = robot.state; 
+
+            // Frissítjük a vizuális útvonalat
+            this.updatePathVisuals(robot);
+
+            var targetY;
+            if (robot.state === "Charging") {
+                targetY = 0.2;
+            } else {
+                targetY = 1.8 + Math.sin(Date.now() * 0.003 + robot.id) * 0.1;
+            }
+
+            root.position.x = BABYLON.Scalar.Lerp(root.position.x, robot.x, 0.2);
+            root.position.z = BABYLON.Scalar.Lerp(root.position.z, robot.y, 0.2);
+            root.position.y = BABYLON.Scalar.Lerp(root.position.y, targetY, 0.1); 
+
+            if (robotObj.cargoMesh) robotObj.cargoMesh.isVisible = robot.hasCargo;
+            if (robot.currentTargetNode) this.highlightShelf(robot.currentTargetNode.x, robot.currentTargetNode.y, robot.colorHex);
+        });
+    },
+
+    // ... (A createDropOffZones, createMap, createDroneMesh, highlightShelf, clearShelfHighlights függvények változatlanok maradnak!) ...
     createDropOffZones: function() {
         for (let i = 0; i < 5; i++) {
             let colorHex = this.zoneColors[i % this.zoneColors.length];
@@ -129,7 +236,6 @@ window.warehouseVisualizer = {
             this.shadowGenerator.addShadowCaster(shelf); this.mirrorTexture.renderList.push(shelf);
         });
     },
-    // Build complete drone mesh with propellers, arms, and cargo bay
     createDroneMesh: function(id, colorHex) {
         var color = BABYLON.Color3.FromHexString(colorHex);
         var root = new BABYLON.TransformNode("root_" + id, this.scene);
@@ -151,54 +257,6 @@ window.warehouseVisualizer = {
         var cargoMat = new BABYLON.StandardMaterial("cargoMat", this.scene); cargoMat.emissiveColor = new BABYLON.Color3(1, 1, 1); cargo.material = cargoMat; cargo.isVisible = false; 
         return { mesh: root, lightMat: lightMat, cargoMesh: cargo, propellers: propellers };
     },
-
-    // Update all robot positions and states from server data
-    updateRobots: function (robotsData) {
-        this.clearShelfHighlights();
-
-        robotsData.forEach(robot => {
-            var robotObj = this.robotMeshes[robot.id];
-
-            if (!robotObj) {
-                robotObj = this.createDroneMesh(robot.id, robot.colorHex);
-                robotObj.mesh.getChildMeshes().forEach(m => {
-                    this.shadowGenerator.addShadowCaster(m);
-                    this.mirrorTexture.renderList.push(m);
-                });
-                robotObj.metadata = { 
-                    baseColor: BABYLON.Color3.FromHexString(robot.colorHex),
-                    hasCargo: false,
-                    state: "Idle"
-                };
-                this.robotMeshes[robot.id] = robotObj;
-            }
-
-            var root = robotObj.mesh;
-            
-            robotObj.metadata.hasCargo = robot.hasCargo;
-            robotObj.metadata.state = robot.state; 
-
-            var targetY;
-            if (robot.state === "Charging") {
-                targetY = 0.2;
-            } else {
-                targetY = 1.8 + Math.sin(Date.now() * 0.003 + robot.id) * 0.1;
-            }
-
-            root.position.x = BABYLON.Scalar.Lerp(root.position.x, robot.x, 0.2);
-            root.position.z = BABYLON.Scalar.Lerp(root.position.z, robot.y, 0.2);
-            root.position.y = BABYLON.Scalar.Lerp(root.position.y, targetY, 0.1); 
-
-            if (robotObj.cargoMesh) {
-                robotObj.cargoMesh.isVisible = robot.hasCargo;
-            }
-
-            if (robot.currentTargetNode) {
-                this.highlightShelf(robot.currentTargetNode.x, robot.currentTargetNode.y, robot.colorHex);
-            }
-        });
-    },
-
     highlightShelf: function(x, y, colorHex) {
         var shelfId = "obs_" + x + "_" + y;
         var shelfMesh = this.scene.getMeshByName(shelfId);
