@@ -119,13 +119,10 @@ window.warehouseVisualizer = {
         }
     },
 
-    // ÚJ: Vizuális elemek frissítése (Vonal + Marker)
     updatePathVisuals: function(robot) {
         var id = robot.id;
         var color = BABYLON.Color3.FromHexString(robot.colorHex);
 
-        // 1. CÉLKERESZT (Marker)
-        // Csak akkor rajzoljuk, ha van célja és nem Idle/Charging
         if (robot.state !== "Idle" && robot.state !== "Charging") {
             if (!this.targetMarkers[id]) {
                 var marker = BABYLON.MeshBuilder.CreateTorus("target_" + id, { diameter: 0.8, thickness: 0.1 }, this.scene);
@@ -144,10 +141,9 @@ window.warehouseVisualizer = {
             if (this.targetMarkers[id]) this.targetMarkers[id].isVisible = false;
         }
 
-        // 2. ÚTVONAL (Vonal)
         if (robot.currentPath && robot.currentPath.length > 0) {
             var points = [];
-            points.push(new BABYLON.Vector3(robot.x, 0.2, robot.y)); // Start
+            points.push(new BABYLON.Vector3(robot.x, 0.2, robot.y));
             for (var i = 0; i < robot.currentPath.length; i++) {
                 var p = robot.currentPath[i];
                 points.push(new BABYLON.Vector3(p.x, 0.2, p.y));
@@ -190,7 +186,6 @@ window.warehouseVisualizer = {
             robotObj.metadata.hasCargo = robot.hasCargo;
             robotObj.metadata.state = robot.state; 
 
-            // Frissítjük a vizuális útvonalat
             this.updatePathVisuals(robot);
 
             var targetY;
@@ -209,7 +204,6 @@ window.warehouseVisualizer = {
         });
     },
 
-    // ... (A createDropOffZones, createMap, createDroneMesh, highlightShelf, clearShelfHighlights függvények változatlanok maradnak!) ...
     createDropOffZones: function() {
         for (let i = 0; i < 5; i++) {
             let colorHex = this.zoneColors[i % this.zoneColors.length];

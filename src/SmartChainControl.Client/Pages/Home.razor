@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using SmartChainControl.Shared.Models
 @inject IJSRuntime JS
+@inject NavigationManager NavManager
 @implements IAsyncDisposable
 
 <PageTitle>SmartChainControl - Command Center</PageTitle>
@@ -109,7 +110,7 @@
     {
         objRef = DotNetObjectReference.Create(this);
         hubConnection = new HubConnectionBuilder()
-            .WithUrl("http://localhost:5206/warehousehub")
+            .WithUrl(NavManager.ToAbsoluteUri("/warehousehub"))
             .AddMessagePackProtocol()
             .WithAutomaticReconnect()
             .Build();

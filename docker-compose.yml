@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  warehouse-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartchain_warehouse
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    ports:
+      - "127.0.0.1:5206:8080"
+    restart: unless-stopped
