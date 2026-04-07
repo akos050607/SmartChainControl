@@ -8,7 +8,7 @@ services:
     container_name: smartchaincontrol
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - VIRTUAL_HOST=smartchaincontrol.te-domained.hu 
+      - VIRTUAL_HOST=smartchaincontrol.szenassy-akos.com
     networks:
       - proxy-network
     restart: unless-stopped
