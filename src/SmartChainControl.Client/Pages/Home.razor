@@ -72,7 +72,7 @@
             @foreach (var obs in CurrentMap.Obstacles)
             {
                 <div class="map-shelf"
-                     style="left: @((obs.X / 20.0 * 100))%; 
+                     style="left: @((obs.X / 20.0 * 100))%;
                             bottom: @((obs.Y / 20.0 * 100))%;
                             width: 5%; height: 5%;
                             background-color: @GetShelfColor(obs.X, obs.Y);">
@@ -85,14 +85,16 @@
             string color = colors[i % colors.Length];
             int yPos = 2 + (i * 3);
             <div class="map-zone"
-                 style="left: 0%; bottom: @((yPos / 20.0 * 100))%;
+                 style="left: 0%;
+                        bottom: @((yPos / 20.0 * 100))%;
                         width: 6%; height: 6%;
-                        border-color: @color; color: @color;">Z@(i+1)</div>
+                        border-color: @color;
+                        color: @color;">Z@(i+1)</div>
         }
         @foreach (var robot in Robots)
         {
             <div class="radar-dot"
-                 style="left: @((robot.X / 20.0 * 100))%; 
+                 style="left: @((robot.X / 20.0 * 100))%;
                         bottom: @((robot.Y / 20.0 * 100))%;
                         background-color: @robot.ColorHex;"></div>
         }
@@ -133,6 +135,7 @@
             StateHasChanged(); 
             await JS.InvokeVoidAsync("warehouseVisualizer.createMap", map);
         });
+
         await hubConnection.StartAsync();
     }
 

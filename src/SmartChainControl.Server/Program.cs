@@ -5,13 +5,12 @@ using SmartChainControl.Server.Workers;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure SignalR with MessagePack for efficient binary serialization
 builder.Services.AddSignalR()
        .AddMessagePackProtocol();
+
 builder.Services.AddSingleton<SimulationManager>();
 builder.Services.AddHostedService<GameLoopWorker>();
 
-// Allow all origins for development - restrict in production
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -23,40 +22,33 @@ builder.Services.AddCors(options =>
     });
 });
 
-
-// Enable response compression for SignalR binary messages
 builder.Services.AddResponseCompression(opts =>
 {
     opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
         new[] { "application/octet-stream" });
 });
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
 
-//app.UseHttpsRedirection();
-
-app.UseAuthorization();
+// app.UseHttpsRedirection(); // Disabled for Docker/Reverse Proxy compatibility
 
 app.UseResponseCompression();
-app.UseCors();
-
 app.UseBlazorFrameworkFiles();
-app.UseStaticFiles();          
+app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseCors();
 app.UseAuthorization();
 
 app.MapHub<WarehouseHub>("/warehousehub");
-
 app.MapFallbackToFile("index.html"); 
 
 app.Run();
