@@ -5,7 +5,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    container_name: smartchain_warehouse
+    container_name: smartchaincontrol
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
     ports:
