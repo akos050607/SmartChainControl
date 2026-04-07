@@ -8,6 +8,11 @@ services:
     container_name: smartchaincontrol
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-    ports:
-      - "127.0.0.1:5206:8080"
+      - VIRTUAL_HOST=smartchaincontrol.te-domained.hu 
+    networks:
+      - proxy-network
     restart: unless-stopped
+
+networks:
+  proxy-network:
+    external: true
