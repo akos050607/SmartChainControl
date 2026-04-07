@@ -49,6 +49,14 @@ app.UseAuthorization();
 app.UseResponseCompression();
 app.UseCors();
 
+app.UseBlazorFrameworkFiles();
+app.UseStaticFiles();          
+
+app.UseRouting();
+app.UseAuthorization();
+
 app.MapHub<WarehouseHub>("/warehousehub");
+
+app.MapFallbackToFile("index.html"); 
 
 app.Run();
