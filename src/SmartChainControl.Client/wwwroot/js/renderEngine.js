@@ -22,7 +22,9 @@ window.warehouseVisualizer = {
         this.engine = new BABYLON.Engine(this.canvas, true, { preserveDrawingBuffer: true, antialias: true });
         this.scene = new BABYLON.Scene(this.engine);
         this.scene.clearColor = new BABYLON.Color3(0.02, 0.02, 0.04); 
-
+        this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+        this.scene.fogDensity = 0.015;
+        this.scene.fogColor = this.scene.clearColor;
         var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 3, 24, new BABYLON.Vector3(10, 0, 10), this.scene);
         camera.attachControl(this.canvas, true);
         camera.wheelPrecision = 50;
@@ -140,25 +142,8 @@ window.warehouseVisualizer = {
         } else {
             if (this.targetMarkers[id]) this.targetMarkers[id].isVisible = false;
         }
-
-        if (robot.currentPath && robot.currentPath.length > 0) {
-            var points = [];
-            points.push(new BABYLON.Vector3(robot.x, 0.2, robot.y));
-            for (var i = 0; i < robot.currentPath.length; i++) {
-                var p = robot.currentPath[i];
-                points.push(new BABYLON.Vector3(p.x, 0.2, p.y));
-            }
-
-            if (this.pathLines[id]) {
-                this.pathLines[id] = BABYLON.MeshBuilder.CreateDashedLines(null, { points: points, instance: this.pathLines[id] });
-            } else {
-                var lines = BABYLON.MeshBuilder.CreateDashedLines("path_" + id, { points: points, dashSize: 3, gapSize: 1 }, this.scene);
-                lines.color = color;
-                this.pathLines[id] = lines;
-            }
-            this.pathLines[id].isVisible = true;
-        } else {
-            if (this.pathLines[id]) this.pathLines[id].isVisible = false;
+        if (this.pathLines[id]) {
+            this.pathLines[id].isVisible = false;
         }
     },
 
