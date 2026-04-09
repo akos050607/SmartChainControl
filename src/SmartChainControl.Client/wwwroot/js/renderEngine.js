@@ -19,7 +19,7 @@ window.warehouseVisualizer = {
         this.highlightedShelves = [];
 
         this.canvas = document.getElementById(canvasId);
-        this.engine = new BABYLON.Engine(this.canvas, true, { preserveDrawingBuffer: true, antialias: true });
+        this.engine = new BABYLON.Engine(this.canvas, true, { preserveDrawingBuffer: true, antialias: true, alpha: true });
         this.scene = new BABYLON.Scene(this.engine);
         this.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
         this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
