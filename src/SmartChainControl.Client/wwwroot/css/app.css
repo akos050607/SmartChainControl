@@ -4,7 +4,7 @@ html, body {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background: radial-gradient(circle at 50% 50%, #1a2235 0%, #030406 100%); /*ha ez itt van akkor jó*/
+    background: radial-gradient(circle at 50% 50%, #1a2235 0%, #030406 100%);
     font-family: 'Segoe UI', 'Roboto', monospace;
     color: #e0e0e0;
 }
