@@ -24,7 +24,7 @@ window.warehouseVisualizer = {
         this.scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
         this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
         this.scene.fogDensity = 0.015;
-        this.scene.fogColor = this.scene.clearColor;
+        this.scene.fogColor = new BABYLON.Color3(0.01, 0.015, 0.025);
         var camera = new BABYLON.ArcRotateCamera("Camera", Math.PI / 2, Math.PI / 3, 24, new BABYLON.Vector3(10, 0, 10), this.scene);
         camera.attachControl(this.canvas, true);
         camera.wheelPrecision = 50;
@@ -76,6 +76,7 @@ window.warehouseVisualizer = {
         groundMat.diffuseColor = new BABYLON.Color3(0.05, 0.05, 0.05); 
         groundMat.reflectionTexture = this.mirrorTexture; 
         groundMat.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2); 
+        groundMat.alpha = 0.15;
         ground.material = groundMat;
 
         this.createDropOffZones();
