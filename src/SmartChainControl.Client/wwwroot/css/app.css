@@ -1,38 +1,25 @@
-/* 1. A te eredeti háttered (ez jó!) */
 html, body {
     margin: 0;
     padding: 0;
     width: 100vw;
     height: 100vh;
     overflow: hidden;
-    background: radial-gradient(circle at 50% 50%, #1a2235 0%, #030406 100%) !important;
+    background: radial-gradient(circle at 50% 50%, #1a2235 0%, #030406 100%);
     font-family: 'Segoe UI', 'Roboto', monospace;
     color: #e0e0e0;
 }
 
-/* 2. Az alkalmazás gyökere legyen átlátszó */
 #app {
     width: 100%;
     height: 100%;
-    background: transparent !important;
 }
 
-/* 3. A Blazor MainLayout rétegeinek kilövése (EZ A KULCS!) */
-.page, main, article.content {
-    background: transparent !important;
-    background-color: transparent !important;
-    box-shadow: none !important;
-}
-
-/* 4. A Canvas erőszakos átlátszóvá tétele */
 #renderCanvas {
     width: 100%;
     height: 100%;
     touch-action: none;
     outline: none;
     display: block;
-    background: transparent !important;
-    background-color: transparent !important;
 }
 
 .hud-panel {
