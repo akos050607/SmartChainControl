@@ -42,11 +42,14 @@
 
 <body>
     <div id="app">
-        <svg class="loading-progress">
-            <circle r="40%" cx="50%" cy="50%" />
-            <circle r="40%" cx="50%" cy="50%" />
-        </svg>
-        <div class="loading-progress-text"></div>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #fff; letter-spacing: 4px; margin-bottom: 15px;">
+                <span style="color: #00ffff;">SMART</span>
+            </div>
+            <div style="color: #00ffff; font-family: 'Segoe UI', monospace; font-size: 1.2rem; letter-spacing: 5px; text-shadow: 0 0 10px #00ffff; animation: pulse 1.5s infinite;">
+                RENDSZER INDÍTÁSA...
+            </div>
+        </div>
     </div>
 
     <div id="blazor-error-ui">
