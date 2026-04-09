@@ -26,10 +26,10 @@ jobs:
             git pull origin main
             
             echo "3. Blazor konténer újraépítése (Cache nélkül)..."
-            docker compose build --no-cache smartchaincontrol
+            docker compose build --no-cache
             
             echo "4. Új konténer elindítása a háttérben..."
-            docker compose up -d smartchaincontrol
+            docker compose up -d
             
             echo "5. Szemét eltakarítása (Régi Docker image-ek törlése)..."
             docker system prune -f
