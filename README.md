@@ -8,7 +8,7 @@
 
 **SmartChainControl** is a high-fidelity, real-time 3D warehouse simulation system. It demonstrates autonomous drone (AGV) pathfinding, task scheduling, and battery lifecycle management in a futuristic environment.
 
-[WEBSITE URL](smartchaincontrol.szenassy-akos.com)
+[WEBSITE URL](https://smartchaincontrol.szenassy-akos.com)
 
 ---
 
